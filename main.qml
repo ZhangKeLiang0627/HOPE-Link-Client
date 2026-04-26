@@ -489,7 +489,7 @@ ApplicationWindow {
 
                         // Send button area
                         Rectangle {
-                            Layout.preferredWidth: 90
+                            Layout.preferredWidth: 100
                             Layout.fillHeight: true
                             color: "#2a2a3e"
                             radius: 4
