@@ -13,6 +13,7 @@ class SerialBridge(QObject):
     portsChanged = Signal()
     connectedChanged = Signal()
     dataReceived = Signal(str)
+    dataSent = Signal(str)
     statusMessageChanged = Signal()
 
     def __init__(self, parent=None):
@@ -113,8 +114,8 @@ class SerialBridge(QObject):
             self._set_status("未连接，无法发送")
             return
         try:
-            # Support hex sending: if user checks hex mode, we handle it in QML
             self._serial_port.write(data.encode("utf-8"))
+            self.dataSent.emit(data)
         except Exception as e:
             self._set_status(f"发送失败: {str(e)}")
 
@@ -128,6 +129,7 @@ class SerialBridge(QObject):
             hex_str = hex_str.replace(" ", "").replace("\n", "").replace("\r", "")
             data = bytes.fromhex(hex_str)
             self._serial_port.write(data)
+            self.dataSent.emit(hex_str.upper())
         except Exception as e:
             self._set_status(f"发送失败: {str(e)}")
 

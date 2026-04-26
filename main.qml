@@ -21,6 +21,17 @@ ApplicationWindow {
     readonly property color successColor: "#a6e3a1"
     readonly property color borderColor: "#45475a"
 
+    // Bubble colors
+    readonly property color receivedBubbleColor: "#313244"
+    readonly property color sentBubbleColor: "#1e3a5f"
+    readonly property color receivedTailColor: "#252536"
+    readonly property color sentTailColor: "#162d4a"
+
+    // Message list model
+    ListModel {
+        id: messageModel
+    }
+
     // ========== Top Toolbar ==========
     Rectangle {
         id: toolbar
@@ -188,6 +199,7 @@ ApplicationWindow {
                 Layout.preferredWidth: 100
                 text: serialBridge.connected ? "断开连接" : "打开串口"
                 btnColor: serialBridge.connected ? errorColor : successColor
+                enabled: serialBridge.connected || portCombo.count > 0
                 onClicked: {
                     if (serialBridge.connected) {
                         serialBridge.disconnect_port()
@@ -211,7 +223,7 @@ ApplicationWindow {
         anchors.margins: 8
         spacing: 8
 
-        // ====== Receive Area ======
+        // ====== Chat Area (Receive + Send combined) ======
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -229,7 +241,7 @@ ApplicationWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: "接收区"
+                        text: "通信记录"
                         color: accentColor
                         font.bold: true
                         font.pixelSize: 14
@@ -241,13 +253,13 @@ ApplicationWindow {
                         Layout.preferredWidth: 50
                         font.pixelSize: 11
                         onClicked: {
-                            receiveText.text = ""
+                            messageModel.clear()
                             serialBridge.clear_buffer()
                         }
                     }
                 }
 
-                // Receive text area
+                // Chat message list
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -257,13 +269,15 @@ ApplicationWindow {
                     border.width: 1
                     clip: true
 
-                    Flickable {
-                        id: receiveFlick
+                    ListView {
+                        id: messageList
                         anchors.fill: parent
-                        anchors.margins: 4
-                        contentWidth: receiveText.width
-                        contentHeight: receiveText.height
+                        anchors.margins: 8
+                        model: messageModel
+                        spacing: 8
                         boundsBehavior: Flickable.StopAtBounds
+                        verticalLayoutDirection: ListView.BottomToTop
+                        displayMarginBeginning: 40
                         ScrollBar.vertical: ScrollBar {
                             policy: ScrollBar.AsNeeded
                             background: Rectangle { color: "transparent" }
@@ -273,21 +287,91 @@ ApplicationWindow {
                             }
                         }
 
-                        TextEdit {
-                            id: receiveText
-                            width: Math.max(receiveFlick.width, implicitWidth)
-                            color: textColor
-                            font.family: "monospace"
-                            font.pixelSize: 13
-                            readOnly: true
-                            selectByMouse: true
-                            wrapMode: TextEdit.Wrap
-                            textFormat: TextEdit.PlainText
+                        delegate: Item {
+                            id: delegateRoot
+                            width: messageList.width
+                            height: {
+                                var h = 2 // top margin
+                                if (timeLabel.visible) h += timeLabel.implicitHeight + 2
+                                h += bubbleRect.height + 6
+                                return h
+                            }
+
+                            readonly property bool isSent: model.isSent
+
+                            // Entry animation
+                            property real entryProgress: 0
+                            NumberAnimation on entryProgress {
+                                from: 0
+                                to: 1.0
+                                duration: 350
+                                easing.type: Easing.OutCubic
+                            }
+
+                            // Fade in + slide up effect
+                            opacity: entryProgress
+                            transform: Translate {
+                                y: (1.0 - delegateRoot.entryProgress) * 20
+                            }
+
+                            // Time label
+                            Text {
+                                id: timeLabel
+                                text: model.time
+                                color: subTextColor
+                                font.pixelSize: 10
+                                anchors.top: parent.top
+                                anchors.topMargin: 2
+                                x: isSent ? parent.width - implicitWidth - 8 : 8
+                                visible: model.showTime
+                            }
+
+                            // Bubble container - anchors to right or left side
+                            Rectangle {
+                                id: bubbleRect
+                                anchors.top: timeLabel.visible ? timeLabel.bottom : parent.top
+                                anchors.topMargin: 2
+                                anchors.left: isSent ? undefined : parent.left
+                                anchors.right: isSent ? parent.right : undefined
+                                anchors.leftMargin: 0
+                                anchors.rightMargin: 0
+                                width: Math.min(msgText.implicitWidth + 20, parent.width * 0.82)
+                                height: msgText.height + 12
+                                color: isSent ? sentBubbleColor : receivedBubbleColor
+                                radius: 8
+                                border.width: 0
+
+                                // Tail triangle (using a rotated rectangle)
+                                // Sent (right side): tail points right (toward sender)
+                                // Received (left side): tail points left (toward receiver)
+                                Rectangle {
+                                    width: 10
+                                    height: 10
+                                    color: parent.color
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: -2
+                                    x: isSent ? parent.width - 5 : -5
+                                    rotation: 45
+                                }
+
+                                // Message content
+                                Text {
+                                    id: msgText
+                                    x: 10
+                                    y: 6
+                                    width: parent.width - 20
+                                    text: model.message
+                                    color: textColor
+                                    font.family: "monospace"
+                                    font.pixelSize: 13
+                                    wrapMode: Text.Wrap
+                                }
+                            }
                         }
                     }
                 }
 
-                // Receive options
+                // Chat options
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 12
@@ -347,157 +431,158 @@ ApplicationWindow {
 
                     Item { Layout.fillWidth: true }
                 }
-            }
-        }
 
-        // ====== Send Area ======
-        Rectangle {
-            Layout.preferredWidth: 280
-            Layout.fillHeight: true
-            color: surfaceColor
-            radius: 6
-            border.color: borderColor
-            border.width: 1
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 8
-                spacing: 4
-
-                // Header
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: "发送区"
-                        color: accentColor
-                        font.bold: true
-                        font.pixelSize: 14
-                    }
-                    Item { Layout.fillWidth: true }
-                    CustomButton {
-                        text: "清空"
-                        Layout.preferredHeight: 24
-                        Layout.preferredWidth: 50
-                        font.pixelSize: 11
-                        onClicked: sendText.text = ""
-                    }
-                }
-
-                // Send text area
+                // Send area (inline)
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    Layout.preferredHeight: 80
                     color: "#1a1a2e"
                     radius: 4
                     border.color: borderColor
                     border.width: 1
                     clip: true
 
-                    Flickable {
-                        id: sendFlick
+                    RowLayout {
                         anchors.fill: parent
                         anchors.margins: 4
-                        contentWidth: sendText.width
-                        contentHeight: sendText.height
-                        boundsBehavior: Flickable.StopAtBounds
-                        ScrollBar.vertical: ScrollBar {
-                            policy: ScrollBar.AsNeeded
-                            background: Rectangle { color: "transparent" }
-                            contentItem: Rectangle {
-                                color: borderColor
-                                radius: 2
-                            }
-                        }
+                        spacing: 6
 
-                        TextArea {
-                            id: sendText
-                            width: Math.max(sendFlick.width, implicitWidth)
-                            color: textColor
-                            font.family: "monospace"
-                            font.pixelSize: 13
-                            wrapMode: TextEdit.Wrap
-                            placeholderText: "输入要发送的数据..."
-                            placeholderTextColor: subTextColor
-                            background: null
-                        }
-                    }
-                }
-
-                // Send options
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    CheckBox {
-                        id: hexSendCheck
-                        text: "HEX发送"
-                        contentItem: Text {
-                            text: parent.text
-                            color: subTextColor
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: parent.indicator.width + parent.spacing
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 16
-                            implicitHeight: 16
-                            x: 0
-                            y: parent.height / 2 - height / 2
+                        // Text input area
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            color: "transparent"
                             radius: 3
-                            color: parent.checked ? accentColor : "#3a3a4e"
                             border.color: borderColor
-                            Rectangle {
-                                x: 3; y: 3
-                                width: 10; height: 10
-                                radius: 2
-                                color: parent.checked ? "#1e1e2e" : "transparent"
+                            border.width: 1
+                            clip: true
+
+                            Flickable {
+                                id: sendFlick
+                                anchors.fill: parent
+                                anchors.margins: 2
+                                contentWidth: sendText.width
+                                contentHeight: sendText.height
+                                boundsBehavior: Flickable.StopAtBounds
+                                ScrollBar.vertical: ScrollBar {
+                                    policy: ScrollBar.AsNeeded
+                                    background: Rectangle { color: "transparent" }
+                                    contentItem: Rectangle {
+                                        color: borderColor
+                                        radius: 2
+                                    }
+                                }
+
+                                TextArea {
+                                    id: sendText
+                                    width: Math.max(sendFlick.width, implicitWidth)
+                                    color: textColor
+                                    font.family: "monospace"
+                                    font.pixelSize: 13
+                                    wrapMode: TextEdit.Wrap
+                                    placeholderText: "输入要发送的数据..."
+                                    placeholderTextColor: subTextColor
+                                    background: null
+                                }
                             }
                         }
-                    }
 
-                    CheckBox {
-                        id: appendNewlineCheck
-                        checked: true
-                        text: "追加换行"
-                        contentItem: Text {
-                            text: parent.text
-                            color: subTextColor
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: parent.indicator.width + parent.spacing
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 16
-                            implicitHeight: 16
-                            x: 0
-                            y: parent.height / 2 - height / 2
-                            radius: 3
-                            color: parent.checked ? accentColor : "#3a3a4e"
+                        // Send button area
+                        Rectangle {
+                            Layout.preferredWidth: 90
+                            Layout.fillHeight: true
+                            color: "#2a2a3e"
+                            radius: 4
                             border.color: borderColor
-                            Rectangle {
-                                x: 3; y: 3
-                                width: 10; height: 10
-                                radius: 2
-                                color: parent.checked ? "#1e1e2e" : "transparent"
-                            }
-                        }
-                    }
-                }
+                            border.width: 1
 
-                // Send button
-                CustomButton {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 36
-                    text: "发送"
-                    btnColor: accentColor
-                    enabled: serialBridge.connected && sendText.text.length > 0
-                    onClicked: {
-                        var data = sendText.text
-                        if (appendNewlineCheck.checked) {
-                            data += "\n"
-                        }
-                        if (hexSendCheck.checked) {
-                            serialBridge.send_hex_data(data)
-                        } else {
-                            serialBridge.send_data(data)
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                spacing: 4
+
+                                CustomButton {
+                                    id: sendBtn
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    text: "发送"
+                                    btnColor: successColor
+                                    enabled: serialBridge.connected && sendText.text.length > 0
+                                    onClicked: {
+                                        var data = sendText.text
+                                        if (appendNewlineCheck.checked) {
+                                            data += "\n"
+                                        }
+                                        if (hexSendCheck.checked) {
+                                            serialBridge.send_hex_data(data)
+                                        } else {
+                                            serialBridge.send_data(data)
+                                        }
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+
+                                    CheckBox {
+                                        id: hexSendCheck
+                                        text: "HEX"
+                                        Layout.fillWidth: true
+                                        contentItem: Text {
+                                            text: parent.text
+                                            color: subTextColor
+                                            font.pixelSize: 10
+                                            verticalAlignment: Text.AlignVCenter
+                                            leftPadding: parent.indicator.width + parent.spacing
+                                        }
+                                        indicator: Rectangle {
+                                            implicitWidth: 14
+                                            implicitHeight: 14
+                                            x: 0
+                                            y: parent.height / 2 - height / 2
+                                            radius: 2
+                                            color: parent.checked ? accentColor : "#3a3a4e"
+                                            border.color: borderColor
+                                            Rectangle {
+                                                x: 2; y: 2
+                                                width: 10; height: 10
+                                                radius: 1
+                                                color: parent.checked ? "#1e1e2e" : "transparent"
+                                            }
+                                        }
+                                    }
+
+                                    CheckBox {
+                                        id: appendNewlineCheck
+                                        checked: true
+                                        text: "↵"
+                                        Layout.fillWidth: true
+                                        contentItem: Text {
+                                            text: parent.text
+                                            color: subTextColor
+                                            font.pixelSize: 12
+                                            verticalAlignment: Text.AlignVCenter
+                                            leftPadding: parent.indicator.width + parent.spacing
+                                        }
+                                        indicator: Rectangle {
+                                            implicitWidth: 14
+                                            implicitHeight: 14
+                                            x: 0
+                                            y: parent.height / 2 - height / 2
+                                            radius: 2
+                                            color: parent.checked ? accentColor : "#3a3a4e"
+                                            border.color: borderColor
+                                            Rectangle {
+                                                x: 2; y: 2
+                                                width: 10; height: 10
+                                                radius: 1
+                                                color: parent.checked ? "#1e1e2e" : "transparent"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -549,19 +634,46 @@ ApplicationWindow {
     Connections {
         target: serialBridge
         function onDataReceived(data) {
+            var displayText = data
             if (hexDisplayCheck.checked) {
                 // Convert to hex string
                 var hex = ""
                 for (var i = 0; i < data.length; i++) {
                     hex += data.charCodeAt(i).toString(16).toUpperCase().padStart(2, "0") + " "
                 }
-                receiveText.text += hex
-            } else {
-                receiveText.text += data
+                displayText = hex
             }
-            if (autoScrollCheck.checked) {
-                receiveFlick.contentY = receiveText.height - receiveFlick.height
+            var now = new Date()
+            var timeStr = now.toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit", second: "2-digit"})
+            messageModel.insert(0, {
+                "message": displayText,
+                "isSent": false,
+                "time": timeStr,
+                "showTime": true
+            })
+        }
+
+        function onDataSent(data) {
+            var displayText = data
+            if (hexDisplayCheck.checked) {
+                // If hex send mode, data is already hex string
+                // Otherwise convert to hex
+                if (!hexSendCheck.checked) {
+                    var hex = ""
+                    for (var i = 0; i < data.length; i++) {
+                        hex += data.charCodeAt(i).toString(16).toUpperCase().padStart(2, "0") + " "
+                    }
+                    displayText = hex
+                }
             }
+            var now = new Date()
+            var timeStr = now.toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit", second: "2-digit"})
+            messageModel.insert(0, {
+                "message": displayText,
+                "isSent": true,
+                "time": timeStr,
+                "showTime": true
+            })
         }
     }
 
