@@ -359,7 +359,7 @@ ApplicationWindow {
                         implicitWidth: exitFullBtnText.implicitWidth + 16
                         implicitHeight: 28
                         radius: 4
-                        color: exitFullBtnMouse.containsMouse ? "#cc000000" : "#00000000"
+                        color: exitFullBtnMouse.containsMouse ? "#9b8724d7" : "#00000000"
                         visible: fullScreenMode
 
                         Text {
@@ -367,7 +367,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             text: "还原"
                             color: exitFullBtnMouse.containsMouse ? textColor : "transparent"
-                            font.pixelSize: 12
+                            font.pixelSize: 13
                         }
 
                         MouseArea {
