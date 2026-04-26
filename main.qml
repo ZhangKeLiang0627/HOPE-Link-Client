@@ -495,31 +495,38 @@ ApplicationWindow {
                             }
 
                             // 包头/数据/包尾 横向排列
-                            RowLayout {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 0
+                                spacing: 2
 
-                                ColumnLayout {
-                                    spacing: 2
+                                // 包头行
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
                                     Text { text: "包头"; color: subTextColor; font.pixelSize: 11; font.bold: true }
-                                    Text { text: "数据"; color: subTextColor; font.pixelSize: 11; font.bold: true }
-                                    Text { text: "包尾"; color: subTextColor; font.pixelSize: 11; font.bold: true }
-                                }
-
-                                ColumnLayout {
-                                    spacing: 2
-                                    Layout.leftMargin: 4
                                     Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
-                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
-                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
-                                }
-
-                                ColumnLayout {
-                                    spacing: 2
-                                    Layout.leftMargin: 4
                                     Text { text: "0xA5 0xA5"; color: "#a6e3a1"; font.pixelSize: 11; font.family: "monospace" }
+                                    Item { Layout.fillWidth: true }
+                                }
+
+                                // 数据行
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    Text { text: "数据"; color: subTextColor; font.pixelSize: 11; font.bold: true }
+                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
                                     Text { text: "1024 bytes (8×128)"; color: textColor; font.pixelSize: 11 }
+                                    Item { Layout.fillWidth: true }
+                                }
+
+                                // 包尾行
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    Text { text: "包尾"; color: subTextColor; font.pixelSize: 11; font.bold: true }
+                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
                                     Text { text: "0x5A 0x5A"; color: "#f38ba8"; font.pixelSize: 11; font.family: "monospace" }
+                                    Item { Layout.fillWidth: true }
                                 }
                             }
 
