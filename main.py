@@ -1,9 +1,20 @@
 import sys
 import serial
 import serial.tools.list_ports
-from PySide6.QtCore import QObject, Signal, Slot, Property, QTimer
+from PySide6.QtCore import QObject, Signal, Slot, Property, QTimer, QByteArray
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+
+
+# OLED 参数
+OLED_WIDTH = 128
+OLED_HEIGHT = 64
+OLED_PAGES = 8  # 64 / 8
+OLED_BUFFER_SIZE = OLED_WIDTH * OLED_PAGES  # 1024
+
+# UART 协议
+PKG_HEADER = b'\xA5\xA5'
+PKG_FOOTER = b'\x5A\x5A'
 
 
 class SerialBridge(QObject):
@@ -15,6 +26,7 @@ class SerialBridge(QObject):
     dataReceived = Signal(str)
     dataSent = Signal(str)
     statusMessageChanged = Signal()
+    oledFrameReady = Signal(list)  # 发送 1024 字节像素数据列表
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,6 +43,11 @@ class SerialBridge(QObject):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._read_data)
         self._buffer = b""
+
+        # OLED 协议解析状态机
+        self._parse_state = 0  # 0:等待头, 1:收到第一个0xA5, 2:接收数据中
+        self._oled_data = bytearray()
+        self._oled_data_count = 0
 
     # ---------- Properties exposed to QML ----------
 
@@ -81,8 +98,12 @@ class SerialBridge(QObject):
             )
             self._connected = True
             self.connectedChanged.emit()
-            self._timer.start(50)  # Poll every 50ms
+            self._timer.start(10)  # Poll every 10ms for faster response
             self._set_status(f"已连接到 {device} @ {baud_rate} bps")
+            # 重置协议解析状态
+            self._parse_state = 0
+            self._oled_data = bytearray()
+            self._oled_data_count = 0
         except PermissionError:
             self._set_status(
                 f"权限不足！请将用户加入 dialout 组:\n"
@@ -137,8 +158,69 @@ class SerialBridge(QObject):
     def clear_buffer(self):
         """Clear the internal read buffer."""
         self._buffer = b""
+        self._parse_state = 0
+        self._oled_data = bytearray()
+        self._oled_data_count = 0
 
     # ---------- Internal methods ----------
+
+    def _parse_oled_packet(self, data):
+        """解析 OLED 数据包，使用状态机处理流式数据。"""
+        for byte in data:
+            b = bytes([byte])
+
+            if self._parse_state == 0:
+                # 等待第一个 0xA5
+                if b == b'\xA5':
+                    self._parse_state = 1
+                continue
+
+            elif self._parse_state == 1:
+                # 等待第二个 0xA5
+                if b == b'\xA5':
+                    # 收到完整包头，准备接收数据
+                    self._parse_state = 2
+                    self._oled_data = bytearray()
+                    self._oled_data_count = 0
+                else:
+                    # 不是第二个 0xA5，回到初始状态
+                    self._parse_state = 0
+                continue
+
+            elif self._parse_state == 2:
+                # 接收 OLED 数据
+                self._oled_data.append(byte)
+                self._oled_data_count += 1
+
+                if self._oled_data_count == OLED_BUFFER_SIZE:
+                    # 已经收满 1024 字节，接下来应该是包尾
+                    self._parse_state = 3
+                continue
+
+            elif self._parse_state == 3:
+                # 等待包尾第一个 0x5A
+                if b == b'\x5A':
+                    self._parse_state = 4
+                else:
+                    # 包尾错误，重置
+                    self._parse_state = 0
+                    self._oled_data = bytearray()
+                    self._oled_data_count = 0
+                continue
+
+            elif self._parse_state == 4:
+                # 等待包尾第二个 0x5A
+                if b == b'\x5A':
+                    # 完整包接收完成！
+                    # 将像素数据转为列表发送给 QML
+                    pixel_list = list(self._oled_data)
+                    self.oledFrameReady.emit(pixel_list)
+                    self._set_status(f"OLED 帧已更新 ({len(pixel_list)} bytes)")
+                # 无论是否成功，重置状态机
+                self._parse_state = 0
+                self._oled_data = bytearray()
+                self._oled_data_count = 0
+                continue
 
     def _read_data(self):
         """Read available data from serial port (called by timer)."""
@@ -147,15 +229,8 @@ class SerialBridge(QObject):
         try:
             if self._serial_port.in_waiting > 0:
                 data = self._serial_port.read(self._serial_port.in_waiting)
-                self._buffer += data
-                # Try to decode as UTF-8, fallback to latin-1
-                try:
-                    text = self._buffer.decode("utf-8")
-                    self._buffer = b""
-                    self.dataReceived.emit(text)
-                except UnicodeDecodeError:
-                    # Incomplete multi-byte character, wait for more data
-                    pass
+                # 直接解析 OLED 协议包
+                self._parse_oled_packet(data)
         except Exception:
             pass
 

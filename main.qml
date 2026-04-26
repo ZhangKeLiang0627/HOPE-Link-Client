@@ -8,7 +8,7 @@ ApplicationWindow {
     height: 600
     minimumWidth: 700
     minimumHeight: 500
-    title: "简易串口助手"
+    title: "u8g2 OLED 仿真器 (128×64)"
     visible: true
 
     // Color scheme
@@ -21,16 +21,29 @@ ApplicationWindow {
     readonly property color successColor: "#a6e3a1"
     readonly property color borderColor: "#45475a"
 
-    // Bubble colors
-    readonly property color receivedBubbleColor: "#313244"
-    readonly property color sentBubbleColor: "#1e3a5f"
-    readonly property color receivedTailColor: "#252536"
-    readonly property color sentTailColor: "#162d4a"
+    // OLED 参数
+    readonly property int oledWidth: 128
+    readonly property int oledHeight: 64
+    readonly property int oledPages: 8
 
-    // Message list model
-    ListModel {
-        id: messageModel
-    }
+    // OLED 像素数据 (1024 bytes, 阴码 列行式 逆向输出)
+    property var oledBuffer: []
+
+    // 像素颜色（默认亮绿色，模拟 OLED）
+    property color pixelColor: "#a6e3a1"
+    property color pixelOffColor: "#000000"
+    property color bgColorCustom: "#000000"
+
+    // 缩放比例
+    readonly property int pixelScale: 4
+    readonly property int displayWidth: oledWidth * pixelScale
+    readonly property int displayHeight: oledHeight * pixelScale
+
+    // 全屏模式
+    property bool fullScreenMode: false
+
+    // 帧计数
+    property int frameCount: 0
 
     // ========== Top Toolbar ==========
     Rectangle {
@@ -38,7 +51,8 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 50
+        height: fullScreenMode ? 0 : 50
+        clip: true
         color: surfaceColor
 
         RowLayout {
@@ -220,13 +234,210 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: statusBar.top
-        anchors.margins: 8
-        spacing: 8
+        anchors.margins: fullScreenMode ? 0 : 8
+        spacing: fullScreenMode ? 0 : 8
 
-        // ====== Chat Area (Receive + Send combined) ======
+        // ====== OLED Display Area ======
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            color: surfaceColor
+            radius: fullScreenMode ? 0 : 6
+            border.color: fullScreenMode ? "transparent" : borderColor
+            border.width: fullScreenMode ? 0 : 1
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: fullScreenMode ? 0 : 8
+                spacing: fullScreenMode ? 0 : 8
+
+                // Header (全屏时隐藏)
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: fullScreenMode ? 0 : implicitHeight
+                    clip: true
+                    visible: !fullScreenMode
+                    Text {
+                        text: "OLED 显示屏 (128×64)"
+                        color: accentColor
+                        font.bold: true
+                        font.pixelSize: 14
+                    }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: serialBridge.connected ? "● 已连接" : "○ 未连接"
+                        color: serialBridge.connected ? successColor : errorColor
+                        font.pixelSize: 12
+                    }
+                }
+
+                    // OLED Screen
+                    Rectangle {
+                        id: oledScreen
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.margins: fullScreenMode ? 0 : 8
+                        color: bgColorCustom
+                        radius: fullScreenMode ? 0 : 8
+                        border.color: fullScreenMode ? "transparent" : borderColor
+                        border.width: fullScreenMode ? 0 : 2
+
+                    // OLED 像素画布
+                    Canvas {
+                        id: oledCanvas
+                        anchors.centerIn: parent
+
+                        // 全屏时自适应缩放
+                        readonly property real scaleFactor: fullScreenMode ?
+                            Math.min(parent.width / displayWidth, parent.height / displayHeight) : 1.0
+
+                        width: displayWidth * scaleFactor
+                        height: displayHeight * scaleFactor
+
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            if (!ctx) return
+
+                            // 清空画布
+                            ctx.fillStyle = pixelOffColor
+                            ctx.fillRect(0, 0, width, height)
+
+                            // 如果没有数据，显示占位文字
+                            if (oledBuffer.length !== 1024) {
+                                // 提示文字
+                                ctx.fillStyle = "#88ffffff"
+                                ctx.font = "bold " + (18 * scaleFactor) + "px monospace"
+                                ctx.textAlign = "center"
+                                ctx.textBaseline = "middle"
+                                ctx.fillText("等待数据...", width / 2, height / 2)
+
+                                // 小字提示
+                                ctx.fillStyle = "#55ffffff"
+                                ctx.font = (10 * scaleFactor) + "px monospace"
+                                ctx.fillText("请确保 MCU 已发送 OLED 帧数据", width / 2, height / 2 + 22 * scaleFactor)
+                                return
+                            }
+
+                            // 绘制像素
+                            ctx.fillStyle = pixelColor
+                            var sf = scaleFactor
+
+                            for (var page = 0; page < 8; page++) {
+                                for (var col = 0; col < 128; col++) {
+                                    var byteVal = oledBuffer[page * 128 + col]
+                                    if (byteVal === undefined) continue
+
+                                    // 逆向输出：bit0 对应 page 内最上面的像素
+                                    for (var bit = 0; bit < 8; bit++) {
+                                        if (byteVal & (1 << bit)) {
+                                            var px = col * pixelScale * sf
+                                            var py = (page * 8 + bit) * pixelScale * sf
+                                            ctx.fillRect(px, py, pixelScale * sf, pixelScale * sf)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 收到新数据时重绘
+                        Connections {
+                            target: serialBridge
+                            function onOledFrameReady(data) {
+                                oledBuffer = data
+                                frameCount++
+                                oledCanvas.requestPaint()
+                            }
+                        }
+                    }
+
+                    // 全屏模式下的悬浮还原按钮（默认在右上角，鼠标悬浮才显示）
+                    Rectangle {
+                        id: exitFullBtn
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 8
+                        implicitWidth: exitFullBtnText.implicitWidth + 16
+                        implicitHeight: 28
+                        radius: 4
+                        color: exitFullBtnMouse.containsMouse ? "#cc000000" : "#00000000"
+                        visible: fullScreenMode
+
+                        Text {
+                            id: exitFullBtnText
+                            anchors.centerIn: parent
+                            text: "还原"
+                            color: exitFullBtnMouse.containsMouse ? textColor : "transparent"
+                            font.pixelSize: 12
+                        }
+
+                        MouseArea {
+                            id: exitFullBtnMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: fullScreenMode = false
+                        }
+                    }
+
+                    // 非全屏模式下的全屏按钮
+                    CustomButton {
+                        id: fullScreenBtn
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 6
+                        implicitWidth: 50
+                        height: 24
+                        text: "全屏"
+                        font.pixelSize: 11
+                        tooltip: "全屏显示"
+                        visible: !fullScreenMode
+                        btnColor: accentColor
+                        onClicked: fullScreenMode = true
+                    }
+                }
+
+                // 状态信息（全屏时隐藏）
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: fullScreenMode ? 0 : implicitHeight
+                    clip: true
+                    visible: !fullScreenMode
+                    spacing: 12
+
+                    Text {
+                        text: "分辨率: 128×64"
+                        color: subTextColor
+                        font.pixelSize: 11
+                    }
+
+                    Text {
+                        text: "像素: " + (oledBuffer.length > 0 ? oledBuffer.length + " bytes" : "无数据")
+                        color: subTextColor
+                        font.pixelSize: 11
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    CustomButton {
+                        text: "清空显示"
+                        Layout.preferredHeight: 24
+                        Layout.preferredWidth: 80
+                        font.pixelSize: 11
+                        onClicked: {
+                            oledBuffer = []
+                            oledCanvas.requestPaint()
+                            serialBridge.clear_buffer()
+                        }
+                    }
+                }
+            }
+        }
+
+        // ====== 右侧信息面板（全屏时隐藏）=====
+        Rectangle {
+            Layout.preferredWidth: fullScreenMode ? 0 : 220
+            Layout.fillHeight: true
+            clip: true
+            visible: !fullScreenMode
             color: surfaceColor
             radius: 6
             border.color: borderColor
@@ -235,31 +446,16 @@ ApplicationWindow {
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 8
-                spacing: 4
+                spacing: 8
 
                 // Header
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: "通信记录"
-                        color: accentColor
-                        font.bold: true
-                        font.pixelSize: 14
-                    }
-                    Item { Layout.fillWidth: true }
-                    CustomButton {
-                        text: "清空"
-                        Layout.preferredHeight: 24
-                        Layout.preferredWidth: 50
-                        font.pixelSize: 11
-                        onClicked: {
-                            messageModel.clear()
-                            serialBridge.clear_buffer()
-                        }
-                    }
+                Text {
+                    text: "协议信息"
+                    color: accentColor
+                    font.bold: true
+                    font.pixelSize: 14
                 }
 
-                // Chat message list
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -267,17 +463,15 @@ ApplicationWindow {
                     radius: 4
                     border.color: borderColor
                     border.width: 1
-                    clip: true
 
-                    ListView {
-                        id: messageList
+                    Flickable {
+                        id: infoFlick
                         anchors.fill: parent
-                        anchors.margins: 8
-                        model: messageModel
-                        spacing: 8
+                        anchors.margins: 6
+                        contentWidth: infoContent.width
+                        contentHeight: infoContent.height
                         boundsBehavior: Flickable.StopAtBounds
-                        verticalLayoutDirection: ListView.BottomToTop
-                        displayMarginBeginning: 40
+                        clip: true
                         ScrollBar.vertical: ScrollBar {
                             policy: ScrollBar.AsNeeded
                             background: Rectangle { color: "transparent" }
@@ -287,303 +481,293 @@ ApplicationWindow {
                             }
                         }
 
-                        delegate: Item {
-                            id: delegateRoot
-                            width: messageList.width
-                            height: {
-                                var h = 2 // top margin
-                                if (timeLabel.visible) h += timeLabel.implicitHeight + 2
-                                h += bubbleRect.height + 6
-                                return h
-                            }
+                        ColumnLayout {
+                            id: infoContent
+                            width: parent.width
+                            spacing: 4
 
-                            readonly property bool isSent: model.isSent
-
-                            // Entry animation
-                            property real entryProgress: 0
-                            NumberAnimation on entryProgress {
-                                from: 0
-                                to: 1.0
-                                duration: 350
-                                easing.type: Easing.OutCubic
-                            }
-
-                            // Fade in + slide up effect
-                            opacity: entryProgress
-                            transform: Translate {
-                                y: (1.0 - delegateRoot.entryProgress) * 20
-                            }
-
-                            // Time label
+                            // 协议说明标题
                             Text {
-                                id: timeLabel
-                                text: model.time
-                                color: subTextColor
-                                font.pixelSize: 10
-                                anchors.top: parent.top
-                                anchors.topMargin: 2
-                                x: isSent ? parent.width - implicitWidth - 8 : 8
-                                visible: model.showTime
+                                text: "协议说明"
+                                color: accentColor
+                                font.bold: true
+                                font.pixelSize: 13
                             }
 
-                            // Bubble container - anchors to right or left side
-                            Rectangle {
-                                id: bubbleRect
-                                anchors.top: timeLabel.visible ? timeLabel.bottom : parent.top
-                                anchors.topMargin: 2
-                                anchors.left: isSent ? undefined : parent.left
-                                anchors.right: isSent ? parent.right : undefined
-                                anchors.leftMargin: 0
-                                anchors.rightMargin: 0
-                                width: Math.min(msgText.implicitWidth + 20, parent.width * 0.82)
-                                height: msgText.height + 12
-                                color: isSent ? sentBubbleColor : receivedBubbleColor
-                                radius: 8
-                                border.width: 0
+                            // 包头/数据/包尾 横向排列
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
 
-                                // Tail triangle (using a rotated rectangle)
-                                // Sent (right side): tail points right (toward sender)
-                                // Received (left side): tail points left (toward receiver)
-                                Rectangle {
-                                    width: 10
-                                    height: 10
-                                    color: parent.color
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.verticalCenterOffset: -2
-                                    x: isSent ? parent.width - 5 : -5
-                                    rotation: 45
+                                ColumnLayout {
+                                    spacing: 2
+                                    Text { text: "包头"; color: subTextColor; font.pixelSize: 11; font.bold: true }
+                                    Text { text: "数据"; color: subTextColor; font.pixelSize: 11; font.bold: true }
+                                    Text { text: "包尾"; color: subTextColor; font.pixelSize: 11; font.bold: true }
                                 }
 
-                                // Message content
-                                Text {
-                                    id: msgText
-                                    x: 10
-                                    y: 6
-                                    width: parent.width - 20
-                                    text: model.message
+                                ColumnLayout {
+                                    spacing: 2
+                                    Layout.leftMargin: 4
+                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
+                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
+                                    Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 2
+                                    Layout.leftMargin: 4
+                                    Text { text: "0xA5 0xA5"; color: "#a6e3a1"; font.pixelSize: 11; font.family: "monospace" }
+                                    Text { text: "1024 bytes (8×128)"; color: textColor; font.pixelSize: 11 }
+                                    Text { text: "0x5A 0x5A"; color: "#f38ba8"; font.pixelSize: 11; font.family: "monospace" }
+                                }
+                            }
+
+                            Item { Layout.preferredHeight: 4 }
+
+                            // 数据格式
+                            Text { text: "数据格式"; color: accentColor; font.bold: true; font.pixelSize: 12 }
+                            Text { text: "• 阴码 (点亮为1)"; color: textColor; font.pixelSize: 11; leftPadding: 8 }
+                            Text { text: "• 列行式 (page先行后列)"; color: textColor; font.pixelSize: 11; leftPadding: 8 }
+                            Text { text: "• 逆向输出 (低位在前)"; color: textColor; font.pixelSize: 11; leftPadding: 8 }
+
+                            Item { Layout.preferredHeight: 4 }
+
+                            // 状态
+                            Text { text: "状态"; color: accentColor; font.bold: true; font.pixelSize: 12 }
+                            Text {
+                                text: "• 帧数: " + frameCount
+                                color: textColor; font.pixelSize: 11; leftPadding: 8
+                            }
+                            Text {
+                                text: "• 缓冲区: " + oledBuffer.length + " bytes"
+                                color: textColor; font.pixelSize: 11; leftPadding: 8
+                            }
+                            Text {
+                                text: "• 串口: " + (serialBridge.connected ? "已连接" : "未连接")
+                                color: serialBridge.connected ? "#a6e3a1" : "#f38ba8"
+                                font.pixelSize: 11; leftPadding: 8
+                            }
+
+                            Item { Layout.fillHeight: true }
+                        }
+                    }
+                }
+
+                // 像素颜色选择器
+                Text {
+                    text: "像素颜色"
+                    color: subTextColor
+                    font.pixelSize: 12
+                    font.bold: true
+                }
+
+                // 预设颜色按钮
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    readonly property var colors: [
+                        { name: "OLED绿", color: "#a6e3a1" },
+                        { name: "白色", color: "#ffffff" },
+                        { name: "蓝色", color: "#89b4fa" },
+                        { name: "红色", color: "#f38ba8" },
+                        { name: "黄色", color: "#f9e2af" },
+                        { name: "紫色", color: "#cba6f7" }
+                    ]
+
+                    Repeater {
+                        model: parent.colors
+                        delegate: Rectangle {
+                            id: colorRect
+                            width: 28
+                            height: 28
+                            radius: 4
+                            color: modelData.color
+                            border.width: pixelColor === modelData.color ? 2 : 0
+                            border.color: "white"
+
+                            MouseArea {
+                                id: colorMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    pixelColor = modelData.color
+                                    pixelOffColor = "#001000"
+                                    oledCanvas.requestPaint()
+                                }
+                            }
+
+                            ToolTip {
+                                text: modelData.name
+                                delay: 500
+                                visible: colorMouseArea.containsMouse
+                                background: Rectangle {
+                                    color: surfaceColor
+                                    border.color: borderColor
+                                    radius: 4
+                                }
+                                contentItem: Text {
+                                    text: modelData.name
                                     color: textColor
-                                    font.family: "monospace"
-                                    font.pixelSize: 13
-                                    wrapMode: Text.Wrap
                                 }
                             }
                         }
                     }
                 }
 
-                // Chat options
+                // 自定义颜色选择器
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 12
+                    spacing: 4
 
-                    CheckBox {
-                        id: autoScrollCheck
-                        checked: true
-                        text: "自动滚动"
-                        contentItem: Text {
-                            text: parent.text
-                            color: subTextColor
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: parent.indicator.width + parent.spacing
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 16
-                            implicitHeight: 16
-                            x: 0
-                            y: parent.height / 2 - height / 2
+                    Rectangle {
+                        Layout.preferredWidth: 24
+                        Layout.preferredHeight: 24
+                        radius: 4
+                        color: pixelColor
+                        border.color: borderColor
+                        border.width: 1
+                    }
+
+                    TextField {
+                        id: colorInput
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 24
+                        text: pixelColor
+                        color: textColor
+                        font.family: "monospace"
+                        font.pixelSize: 11
+                        placeholderText: "#RRGGBB"
+                        placeholderTextColor: subTextColor
+                        background: Rectangle {
+                            color: "#3a3a4e"
                             radius: 3
-                            color: parent.checked ? accentColor : "#3a3a4e"
                             border.color: borderColor
-                            Rectangle {
-                                x: 3; y: 3
-                                width: 10; height: 10
-                                radius: 2
-                                color: parent.checked ? "#1e1e2e" : "transparent"
+                            border.width: 1
+                        }
+                        onEditingFinished: {
+                            var c = colorInput.text.trim()
+                            if (c.length === 7 && c[0] === '#') {
+                                pixelColor = c
+                                oledCanvas.requestPaint()
                             }
                         }
                     }
-
-                    CheckBox {
-                        id: hexDisplayCheck
-                        text: "HEX显示"
-                        contentItem: Text {
-                            text: parent.text
-                            color: subTextColor
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: parent.indicator.width + parent.spacing
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 16
-                            implicitHeight: 16
-                            x: 0
-                            y: parent.height / 2 - height / 2
-                            radius: 3
-                            color: parent.checked ? accentColor : "#3a3a4e"
-                            border.color: borderColor
-                            Rectangle {
-                                x: 3; y: 3
-                                width: 10; height: 10
-                                radius: 2
-                                color: parent.checked ? "#1e1e2e" : "transparent"
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
                 }
 
-                // Send area (inline)
-                Rectangle {
+                // 背景颜色选择器
+                Text {
+                    text: "背景颜色"
+                    color: subTextColor
+                    font.pixelSize: 12
+                    font.bold: true
+                }
+
+                // 预设背景颜色按钮
+                Flow {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 80
-                    color: "#1a1a2e"
-                    radius: 4
-                    border.color: borderColor
-                    border.width: 1
-                    clip: true
+                    spacing: 4
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        spacing: 6
+                    readonly property var bgColors: [
+                        { name: "暗黑", color: "#0a0a0a" },
+                        { name: "深蓝", color: "#0a0a1a" },
+                        { name: "深绿", color: "#0a1a0a" },
+                        { name: "深红", color: "#1a0a0a" },
+                        { name: "深紫", color: "#1a0a1a" },
+                        { name: "深灰", color: "#1a1a1a" }
+                    ]
 
-                        // Text input area
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            color: "transparent"
+                    Repeater {
+                        model: parent.bgColors
+                        delegate: Rectangle {
+                            id: bgColorRect
+                            width: 28
+                            height: 28
+                            radius: 4
+                            color: modelData.color
+                            border.width: bgColorCustom === modelData.color ? 2 : 0
+                            border.color: "white"
+
+                            MouseArea {
+                                id: bgColorMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    bgColorCustom = modelData.color
+                                    pixelOffColor = modelData.color
+                                    oledCanvas.requestPaint()
+                                }
+                            }
+
+                            ToolTip {
+                                text: modelData.name
+                                delay: 500
+                                visible: bgColorMouseArea.containsMouse
+                                background: Rectangle {
+                                    color: surfaceColor
+                                    border.color: borderColor
+                                    radius: 4
+                                }
+                                contentItem: Text {
+                                    text: modelData.name
+                                    color: textColor
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 自定义背景颜色
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Rectangle {
+                        Layout.preferredWidth: 24
+                        Layout.preferredHeight: 24
+                        radius: 4
+                        color: bgColorCustom
+                        border.color: borderColor
+                        border.width: 1
+                    }
+
+                    TextField {
+                        id: bgColorInput
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 24
+                        text: bgColorCustom
+                        color: textColor
+                        font.family: "monospace"
+                        font.pixelSize: 11
+                        placeholderText: "#RRGGBB"
+                        placeholderTextColor: subTextColor
+                        background: Rectangle {
+                            color: "#3a3a4e"
                             radius: 3
                             border.color: borderColor
                             border.width: 1
-                            clip: true
-
-                            Flickable {
-                                id: sendFlick
-                                anchors.fill: parent
-                                anchors.margins: 2
-                                contentWidth: sendText.width
-                                contentHeight: sendText.height
-                                boundsBehavior: Flickable.StopAtBounds
-                                ScrollBar.vertical: ScrollBar {
-                                    policy: ScrollBar.AsNeeded
-                                    background: Rectangle { color: "transparent" }
-                                    contentItem: Rectangle {
-                                        color: borderColor
-                                        radius: 2
-                                    }
-                                }
-
-                                TextArea {
-                                    id: sendText
-                                    width: Math.max(sendFlick.width, implicitWidth)
-                                    color: textColor
-                                    font.family: "monospace"
-                                    font.pixelSize: 13
-                                    wrapMode: TextEdit.Wrap
-                                    placeholderText: "输入要发送的数据..."
-                                    placeholderTextColor: subTextColor
-                                    background: null
-                                }
+                        }
+                        onEditingFinished: {
+                            var c = bgColorInput.text.trim()
+                            if (c.length === 7 && c[0] === '#') {
+                                bgColorCustom = c
+                                pixelOffColor = c
+                                oledCanvas.requestPaint()
                             }
                         }
+                    }
+                }
 
-                        // Send button area
-                        Rectangle {
-                            Layout.preferredWidth: 100
-                            Layout.fillHeight: true
-                            color: "#2a2a3e"
-                            radius: 4
-                            border.color: borderColor
-                            border.width: 1
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 4
-                                spacing: 4
-
-                                CustomButton {
-                                    id: sendBtn
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    text: "发送"
-                                    btnColor: successColor
-                                    enabled: serialBridge.connected && sendText.text.length > 0
-                                    onClicked: {
-                                        var data = sendText.text
-                                        if (appendNewlineCheck.checked) {
-                                            data += "\n"
-                                        }
-                                        if (hexSendCheck.checked) {
-                                            serialBridge.send_hex_data(data)
-                                        } else {
-                                            serialBridge.send_data(data)
-                                        }
-                                    }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
-
-                                    CheckBox {
-                                        id: hexSendCheck
-                                        text: "HEX"
-                                        Layout.fillWidth: true
-                                        contentItem: Text {
-                                            text: parent.text
-                                            color: subTextColor
-                                            font.pixelSize: 10
-                                            verticalAlignment: Text.AlignVCenter
-                                            leftPadding: parent.indicator.width + parent.spacing
-                                        }
-                                        indicator: Rectangle {
-                                            implicitWidth: 14
-                                            implicitHeight: 14
-                                            x: 0
-                                            y: parent.height / 2 - height / 2
-                                            radius: 2
-                                            color: parent.checked ? accentColor : "#3a3a4e"
-                                            border.color: borderColor
-                                            Rectangle {
-                                                x: 2; y: 2
-                                                width: 10; height: 10
-                                                radius: 1
-                                                color: parent.checked ? "#1e1e2e" : "transparent"
-                                            }
-                                        }
-                                    }
-
-                                    CheckBox {
-                                        id: appendNewlineCheck
-                                        checked: true
-                                        text: "↵"
-                                        Layout.fillWidth: true
-                                        contentItem: Text {
-                                            text: parent.text
-                                            color: subTextColor
-                                            font.pixelSize: 12
-                                            verticalAlignment: Text.AlignVCenter
-                                            leftPadding: parent.indicator.width + parent.spacing
-                                        }
-                                        indicator: Rectangle {
-                                            implicitWidth: 14
-                                            implicitHeight: 14
-                                            x: 0
-                                            y: parent.height / 2 - height / 2
-                                            radius: 2
-                                            color: parent.checked ? accentColor : "#3a3a4e"
-                                            border.color: borderColor
-                                            Rectangle {
-                                                x: 2; y: 2
-                                                width: 10; height: 10
-                                                radius: 1
-                                                color: parent.checked ? "#1e1e2e" : "transparent"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                // 发送请求帧按钮
+                CustomButton {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    text: "发送请求帧"
+                    btnColor: accentColor
+                    enabled: serialBridge.connected
+                    onClicked: {
+                        serialBridge.send_hex_data("A5 A5")
                     }
                 }
             }
@@ -596,7 +780,8 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 28
+        height: fullScreenMode ? 0 : 28
+        clip: true
         color: surfaceColor
 
         RowLayout {
@@ -627,53 +812,6 @@ ApplicationWindow {
                 font.pixelSize: 12
                 font.bold: true
             }
-        }
-    }
-
-    // ========== Connections ==========
-    Connections {
-        target: serialBridge
-        function onDataReceived(data) {
-            var displayText = data
-            if (hexDisplayCheck.checked) {
-                // Convert to hex string
-                var hex = ""
-                for (var i = 0; i < data.length; i++) {
-                    hex += data.charCodeAt(i).toString(16).toUpperCase().padStart(2, "0") + " "
-                }
-                displayText = hex
-            }
-            var now = new Date()
-            var timeStr = now.toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit", second: "2-digit"})
-            messageModel.insert(0, {
-                "message": displayText,
-                "isSent": false,
-                "time": timeStr,
-                "showTime": true
-            })
-        }
-
-        function onDataSent(data) {
-            var displayText = data
-            if (hexDisplayCheck.checked) {
-                // If hex send mode, data is already hex string
-                // Otherwise convert to hex
-                if (!hexSendCheck.checked) {
-                    var hex = ""
-                    for (var i = 0; i < data.length; i++) {
-                        hex += data.charCodeAt(i).toString(16).toUpperCase().padStart(2, "0") + " "
-                    }
-                    displayText = hex
-                }
-            }
-            var now = new Date()
-            var timeStr = now.toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit", second: "2-digit"})
-            messageModel.insert(0, {
-                "message": displayText,
-                "isSent": true,
-                "time": timeStr,
-                "showTime": true
-            })
         }
     }
 
