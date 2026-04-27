@@ -16,6 +16,10 @@ ApplicationWindow {
     // 自定义标题栏高度
     readonly property int titleBarHeight: 36
 
+    // 边缘拉伸区域宽度
+    readonly property int resizeHandleWidth: 6
+    readonly property int resizeCornerWidth: 16
+
     // Color scheme
     readonly property color bgColor: "#1e1e2e"
     readonly property color surfaceColor: "#2a2a3e"
@@ -50,6 +54,157 @@ ApplicationWindow {
     // 帧计数
     property int frameCount: 0
 
+    // 窗口是否处于最大化状态（用于禁用拉伸）
+    property bool isMaximized: false
+
+    // ========== 窗口边缘拉伸区域 ==========
+    // 使用统一的鼠标事件处理，避免多个 MouseArea 重叠导致的抖动问题
+    // 通过 mouse.x/mouse.y 判断鼠标在窗口中的位置，决定拉伸方向
+
+    // 边缘拉伸检测区域（覆盖整个窗口，但只处理边缘区域的鼠标事件）
+    MouseArea {
+        id: resizeArea
+        anchors.fill: parent
+        hoverEnabled: true
+        enabled: !isMaximized && !fullScreenMode
+        propagateComposedEvents: true
+
+        // 拉伸方向: 0=无, 1=上, 2=下, 3=左, 4=右, 5=左上, 6=右上, 7=左下, 8=右下
+        property int resizeDir: 0
+
+        // 记录按下时的状态
+        property real pressScreenX: 0
+        property real pressScreenY: 0
+        property real pressWindowX: 0
+        property real pressWindowY: 0
+        property real pressWidth: 0
+        property real pressHeight: 0
+
+        // 判断鼠标是否在边缘区域
+        function getResizeDir(mx, my) {
+            var w = root.width
+            var h = root.height
+            var hw = resizeHandleWidth
+            var cw = resizeCornerWidth
+
+            var onTop = my < hw
+            var onBottom = my > h - hw
+            var onLeft = mx < hw
+            var onRight = mx > w - hw
+
+            // 角落优先判断
+            if (onTop && onLeft) return 5  // 左上
+            if (onTop && onRight) return 6  // 右上
+            if (onBottom && onLeft) return 7  // 左下
+            if (onBottom && onRight) return 8  // 右下
+            if (onTop) return 1  // 上
+            if (onBottom) return 2  // 下
+            if (onLeft) return 3  // 左
+            if (onRight) return 4  // 右
+            return 0  // 不在边缘
+        }
+
+        // 更新光标形状
+        function updateCursor(mx, my) {
+            var dir = getResizeDir(mx, my)
+            resizeDir = dir
+            switch (dir) {
+                case 1: cursorShape = Qt.SizeVerCursor; break
+                case 2: cursorShape = Qt.SizeVerCursor; break
+                case 3: cursorShape = Qt.SizeHorCursor; break
+                case 4: cursorShape = Qt.SizeHorCursor; break
+                case 5: cursorShape = Qt.SizeFDiagCursor; break
+                case 6: cursorShape = Qt.SizeBDiagCursor; break
+                case 7: cursorShape = Qt.SizeBDiagCursor; break
+                case 8: cursorShape = Qt.SizeFDiagCursor; break
+                default: cursorShape = Qt.ArrowCursor; break
+            }
+        }
+
+        onPositionChanged: function(mouse) {
+            if (pressed) {
+                // 正在拖拽拉伸
+                if (resizeDir !== 0) {
+                    var dx = (root.x + mouse.x) - pressScreenX
+                    var dy = (root.y + mouse.y) - pressScreenY
+
+                    var newX = pressWindowX
+                    var newY = pressWindowY
+                    var newW = pressWidth
+                    var newH = pressHeight
+
+                    switch (resizeDir) {
+                        case 1: // 上
+                            newY = pressWindowY + dy
+                            newH = pressHeight - dy
+                            break
+                        case 2: // 下
+                            newH = pressHeight + dy
+                            break
+                        case 3: // 左
+                            newX = pressWindowX + dx
+                            newW = pressWidth - dx
+                            break
+                        case 4: // 右
+                            newW = pressWidth + dx
+                            break
+                        case 5: // 左上
+                            newX = pressWindowX + dx
+                            newY = pressWindowY + dy
+                            newW = pressWidth - dx
+                            newH = pressHeight - dy
+                            break
+                        case 6: // 右上
+                            newY = pressWindowY + dy
+                            newW = pressWidth + dx
+                            newH = pressHeight - dy
+                            break
+                        case 7: // 左下
+                            newX = pressWindowX + dx
+                            newW = pressWidth - dx
+                            newH = pressHeight + dy
+                            break
+                        case 8: // 右下
+                            newW = pressWidth + dx
+                            newH = pressHeight + dy
+                            break
+                    }
+
+                    // 应用最小尺寸限制
+                    if (newW >= root.minimumWidth && newH >= root.minimumHeight) {
+                        root.x = newX
+                        root.y = newY
+                        root.width = newW
+                        root.height = newH
+                    }
+                }
+            } else {
+                // 鼠标移动，更新光标
+                updateCursor(mouse.x, mouse.y)
+            }
+        }
+
+        onPressed: function(mouse) {
+            var dir = getResizeDir(mouse.x, mouse.y)
+            if (dir !== 0) {
+                resizeDir = dir
+                pressScreenX = root.x + mouse.x
+                pressScreenY = root.y + mouse.y
+                pressWindowX = root.x
+                pressWindowY = root.y
+                pressWidth = root.width
+                pressHeight = root.height
+                mouse.accepted = true
+            } else {
+                mouse.accepted = false
+            }
+        }
+
+        onReleased: function(mouse) {
+            resizeDir = 0
+        }
+    }
+
     // ========== Custom Title Bar ==========
     Rectangle {
         id: titleBar
@@ -65,25 +220,23 @@ ApplicationWindow {
             anchors.fill: parent
             property real lastMouseX: 0
             property real lastMouseY: 0
-            onPressed: {
+            onPressed: function(mouse) {
                 lastMouseX = mouseX
                 lastMouseY = mouseY
             }
-            onMouseXChanged: {
+            onPositionChanged: function(mouse) {
                 if (pressed) {
                     root.x += mouseX - lastMouseX
-                }
-            }
-            onMouseYChanged: {
-                if (pressed) {
                     root.y += mouseY - lastMouseY
                 }
             }
             onDoubleClicked: {
                 if (root.visibility === Window.Maximized) {
                     root.showNormal()
+                    isMaximized = false
                 } else {
                     root.showMaximized()
+                    isMaximized = true
                 }
             }
         }
@@ -125,8 +278,10 @@ ApplicationWindow {
                 onClicked: {
                     if (root.visibility === Window.Maximized) {
                         root.showNormal()
+                        isMaximized = false
                     } else {
                         root.showMaximized()
+                        isMaximized = true
                     }
                 }
             }
