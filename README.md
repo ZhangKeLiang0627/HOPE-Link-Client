@@ -25,7 +25,7 @@ sudo apt install libxcb-cursor0 libxcb-xinerama0 libxcb-randr0 libxcb-render0 li
 
 ## Ubuntu的Serial权限问题
 
-> Q: Linux报错没有打开串口权限`/dev/ttyACM0`，`PermissionError: [Errno 13] Permission denied: ‘/dev/ttyACM0’`
+> Linux报错没有打开串口权限`/dev/ttyACM0`，`PermissionError: [Errno 13] Permission denied: ‘/dev/ttyACM0’`
 
 
 ```shell
