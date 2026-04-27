@@ -372,10 +372,10 @@ ApplicationWindow {
                     clip: true
                     visible: !fullScreenMode
                     Text {
-                        text: "OLED 显示屏 (128×64)"
+                        text: "OLED Screen Display"
                         color: accentColor
                         font.bold: true
-                        font.pixelSize: 14
+                        font.pixelSize: 15
                     }
                     Item { Layout.fillWidth: true }
                     Text {
