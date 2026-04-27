@@ -254,24 +254,49 @@ ApplicationWindow {
                 }
             }
 
-            // Baud rate selector
+            // Baud rate selector (可编辑，支持下拉选择和手动输入)
             ComboBox {
                 id: baudCombo
                 Layout.preferredWidth: 120
                 Layout.fillHeight: true
                 model: serialBridge.baudRates
                 currentIndex: 4  // 115200
+                editable: true
+                validator: IntValidator {
+                    bottom: 1
+                    top: 9999999
+                }
+                // 使用默认的 contentItem (TextInput)，只自定义背景和弹出列表
                 background: Rectangle {
                     color: "#3a3a4e"
                     radius: 4
                     border.color: borderColor
                     border.width: 1
                 }
-                contentItem: Text {
-                    text: parent.currentText
-                    color: textColor
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
+                // 下拉箭头指示器
+                indicator: Item {
+                    x: parent.width - width
+                    width: 24
+                    height: parent.height
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 10
+                        height: 6
+                        color: "transparent"
+                        Canvas {
+                            anchors.fill: parent
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.fillStyle = subTextColor
+                                ctx.beginPath()
+                                ctx.moveTo(0, 0)
+                                ctx.lineTo(width, 0)
+                                ctx.lineTo(width / 2, height)
+                                ctx.closePath()
+                                ctx.fill()
+                            }
+                        }
+                    }
                 }
                 popup: Popup {
                     y: parent.height
@@ -335,7 +360,12 @@ ApplicationWindow {
                         if (portCombo.currentIndex < 0) {
                             return
                         }
-                        serialBridge.connect_port(portCombo.currentText, baudCombo.currentText)
+                        // 使用 editText 获取输入框内容（支持自定义输入）
+                        var baudRate = baudCombo.editText.trim()
+                        if (baudRate === "") {
+                            baudRate = baudCombo.currentText
+                        }
+                        serialBridge.connect_port(portCombo.currentText, baudRate)
                     }
                 }
             }
