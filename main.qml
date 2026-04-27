@@ -427,7 +427,7 @@ ApplicationWindow {
 
                                 // 小字提示
                                 ctx.fillStyle = "#55ffffff"
-                                ctx.font = (10 * scaleFactor) + "px monospace"
+                                ctx.font = (12 * scaleFactor) + "px monospace"
                                 ctx.fillText("请确保 MCU 已发送 OLED 帧数据", width / 2, height / 2 + 22 * scaleFactor)
                                 return
                             }
@@ -613,13 +613,24 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 spacing: 2
 
-                                // 包头行
+                                // 包头行 (动态显示)
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 4
                                     Text { text: "包头"; color: subTextColor; font.pixelSize: 11; font.bold: true }
                                     Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
-                                    Text { text: "0xA5 0xA5"; color: "#a6e3a1"; font.pixelSize: 11; font.family: "monospace" }
+                                    Text {
+                                        text: {
+                                            var h = serialBridge.pkgHeader
+                                            if (h.length === 4) {
+                                                return "0x" + h.substring(0, 2) + " 0x" + h.substring(2, 4)
+                                            }
+                                            return "0xA5 0xA5"
+                                        }
+                                        color: "#a6e3a1"
+                                        font.pixelSize: 11
+                                        font.family: "monospace"
+                                    }
                                     Item { Layout.fillWidth: true }
                                 }
 
@@ -633,14 +644,167 @@ ApplicationWindow {
                                     Item { Layout.fillWidth: true }
                                 }
 
-                                // 包尾行
+                                // 包尾行 (动态显示)
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 4
                                     Text { text: "包尾"; color: subTextColor; font.pixelSize: 11; font.bold: true }
                                     Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
-                                    Text { text: "0x5A 0x5A"; color: "#f38ba8"; font.pixelSize: 11; font.family: "monospace" }
+                                    Text {
+                                        text: {
+                                            var f = serialBridge.pkgFooter
+                                            if (f.length === 4) {
+                                                return "0x" + f.substring(0, 2) + " 0x" + f.substring(2, 4)
+                                            }
+                                            return "0x5A 0x5A"
+                                        }
+                                        color: "#f38ba8"
+                                        font.pixelSize: 11
+                                        font.family: "monospace"
+                                    }
                                     Item { Layout.fillWidth: true }
+                                }
+                            }
+
+                            Item { Layout.preferredHeight: 4 }
+
+                            // ====== 自定义包头包尾 ======
+                            Text {
+                                text: "自定义协议"
+                                color: accentColor
+                                font.bold: true
+                                font.pixelSize: 12
+                            }
+
+                            // 包头输入
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Text {
+                                    text: "包头"
+                                    color: subTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                TextField {
+                                    id: headerInput
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 24
+                                    text: serialBridge.pkgHeader
+                                    color: textColor
+                                    font.family: "monospace"
+                                    font.pixelSize: 11
+                                    placeholderText: "A5A5"
+                                    placeholderTextColor: subTextColor
+                                    maximumLength: 4
+                                    background: Rectangle {
+                                        color: "#3a3a4e"
+                                        radius: 3
+                                        border.color: borderColor
+                                        border.width: 1
+                                    }
+                                    validator: RegularExpressionValidator {
+                                        regularExpression: /[0-9a-fA-F]{0,4}/
+                                    }
+                                    onEditingFinished: {
+                                        var val = text.trim().toUpperCase()
+                                        if (val.length === 4) {
+                                            serialBridge.pkgHeader = val
+                                        }
+                                    }
+                                }
+
+                                CustomButton {
+                                    Layout.preferredWidth: 36
+                                    Layout.preferredHeight: 24
+                                    text: "✓"
+                                    font.pixelSize: 11
+                                    tooltip: "应用包头"
+                                    onClicked: {
+                                        var val = headerInput.text.trim().toUpperCase()
+                                        if (val.length === 4) {
+                                            serialBridge.pkgHeader = val
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 包尾输入
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Text {
+                                    text: "包尾"
+                                    color: subTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                TextField {
+                                    id: footerInput
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 24
+                                    text: serialBridge.pkgFooter
+                                    color: textColor
+                                    font.family: "monospace"
+                                    font.pixelSize: 11
+                                    placeholderText: "5A5A"
+                                    placeholderTextColor: subTextColor
+                                    maximumLength: 4
+                                    background: Rectangle {
+                                        color: "#3a3a4e"
+                                        radius: 3
+                                        border.color: borderColor
+                                        border.width: 1
+                                    }
+                                    validator: RegularExpressionValidator {
+                                        regularExpression: /[0-9a-fA-F]{0,4}/
+                                    }
+                                    onEditingFinished: {
+                                        var val = text.trim().toUpperCase()
+                                        if (val.length === 4) {
+                                            serialBridge.pkgFooter = val
+                                        }
+                                    }
+                                }
+
+                                CustomButton {
+                                    Layout.preferredWidth: 36
+                                    Layout.preferredHeight: 24
+                                    text: "✓"
+                                    font.pixelSize: 11
+                                    tooltip: "应用包尾"
+                                    onClicked: {
+                                        var val = footerInput.text.trim().toUpperCase()
+                                        if (val.length === 4) {
+                                            serialBridge.pkgFooter = val
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 重置默认按钮
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Item { Layout.fillWidth: true }
+
+                                CustomButton {
+                                    Layout.preferredHeight: 24
+                                    Layout.preferredWidth: 150
+                                    text: "恢复默认"
+                                    font.pixelSize: 10
+                                    btnColor: subTextColor
+                                    onClicked: {
+                                        serialBridge.pkgHeader = "A5A5"
+                                        serialBridge.pkgFooter = "5A5A"
+                                    }
                                 }
                             }
 

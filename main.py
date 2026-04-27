@@ -12,7 +12,7 @@ OLED_HEIGHT = 64
 OLED_PAGES = 8  # 64 / 8
 OLED_BUFFER_SIZE = OLED_WIDTH * OLED_PAGES  # 1024
 
-# UART 协议
+# UART 协议 (默认值)
 PKG_HEADER = b'\xA5\xA5'
 PKG_FOOTER = b'\x5A\x5A'
 
@@ -27,6 +27,8 @@ class SerialBridge(QObject):
     dataSent = Signal(str)
     statusMessageChanged = Signal()
     oledFrameReady = Signal(list)  # 发送 1024 字节像素数据列表
+    pkgHeaderChanged = Signal()
+    pkgFooterChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -45,9 +47,13 @@ class SerialBridge(QObject):
         self._buffer = b""
 
         # OLED 协议解析状态机
-        self._parse_state = 0  # 0:等待头, 1:收到第一个0xA5, 2:接收数据中
+        self._parse_state = 0
         self._oled_data = bytearray()
         self._oled_data_count = 0
+
+        # 可自定义的包头包尾 (默认: A5 A5 / 5A 5A)
+        self._pkg_header = PKG_HEADER  # bytes, 长度2
+        self._pkg_footer = PKG_FOOTER  # bytes, 长度2
 
     # ---------- Properties exposed to QML ----------
 
@@ -66,6 +72,56 @@ class SerialBridge(QObject):
     @Property(str, notify=statusMessageChanged)
     def statusMessage(self):
         return self._status_message
+
+    # ---------- 可自定义的包头包尾属性 ----------
+
+    @Property(str, notify=pkgHeaderChanged)
+    def pkgHeader(self):
+        """返回包头十六进制字符串，如 'A5A5'"""
+        return self._pkg_header.hex().upper()
+
+    @pkgHeader.setter
+    def pkgHeader(self, hex_str):
+        """设置包头，hex_str 如 'A5A5' 或 'a5 a5'"""
+        try:
+            cleaned = hex_str.replace(" ", "").replace("\n", "").replace("\r", "")
+            data = bytes.fromhex(cleaned)
+            if len(data) != 2:
+                self._set_status("包头必须是2个字节 (4个十六进制字符)")
+                return
+            self._pkg_header = data
+            self.pkgHeaderChanged.emit()
+            self._set_status(f"包头已更新: {data.hex().upper()}")
+            # 重置解析状态
+            self._parse_state = 0
+            self._oled_data = bytearray()
+            self._oled_data_count = 0
+        except Exception as e:
+            self._set_status(f"包头格式错误: {str(e)}")
+
+    @Property(str, notify=pkgFooterChanged)
+    def pkgFooter(self):
+        """返回包尾十六进制字符串，如 '5A5A'"""
+        return self._pkg_footer.hex().upper()
+
+    @pkgFooter.setter
+    def pkgFooter(self, hex_str):
+        """设置包尾，hex_str 如 '5A5A' 或 '5a 5a'"""
+        try:
+            cleaned = hex_str.replace(" ", "").replace("\n", "").replace("\r", "")
+            data = bytes.fromhex(cleaned)
+            if len(data) != 2:
+                self._set_status("包尾必须是2个字节 (4个十六进制字符)")
+                return
+            self._pkg_footer = data
+            self.pkgFooterChanged.emit()
+            self._set_status(f"包尾已更新: {data.hex().upper()}")
+            # 重置解析状态
+            self._parse_state = 0
+            self._oled_data = bytearray()
+            self._oled_data_count = 0
+        except Exception as e:
+            self._set_status(f"包尾格式错误: {str(e)}")
 
     # ---------- Slots callable from QML ----------
 
@@ -165,25 +221,30 @@ class SerialBridge(QObject):
     # ---------- Internal methods ----------
 
     def _parse_oled_packet(self, data):
-        """解析 OLED 数据包，使用状态机处理流式数据。"""
+        """解析 OLED 数据包，使用状态机处理流式数据。
+        使用可配置的 self._pkg_header (2字节) 和 self._pkg_footer (2字节)。
+        """
+        h0, h1 = self._pkg_header[0], self._pkg_header[1]
+        f0, f1 = self._pkg_footer[0], self._pkg_footer[1]
+
         for byte in data:
             b = bytes([byte])
 
             if self._parse_state == 0:
-                # 等待第一个 0xA5
-                if b == b'\xA5':
+                # 等待包头的第一个字节
+                if b == bytes([h0]):
                     self._parse_state = 1
                 continue
 
             elif self._parse_state == 1:
-                # 等待第二个 0xA5
-                if b == b'\xA5':
+                # 等待包头的第二个字节
+                if b == bytes([h1]):
                     # 收到完整包头，准备接收数据
                     self._parse_state = 2
                     self._oled_data = bytearray()
                     self._oled_data_count = 0
                 else:
-                    # 不是第二个 0xA5，回到初始状态
+                    # 不是预期的第二个字节，回到初始状态
                     self._parse_state = 0
                 continue
 
@@ -198,8 +259,8 @@ class SerialBridge(QObject):
                 continue
 
             elif self._parse_state == 3:
-                # 等待包尾第一个 0x5A
-                if b == b'\x5A':
+                # 等待包尾的第一个字节
+                if b == bytes([f0]):
                     self._parse_state = 4
                 else:
                     # 包尾错误，重置
@@ -209,8 +270,8 @@ class SerialBridge(QObject):
                 continue
 
             elif self._parse_state == 4:
-                # 等待包尾第二个 0x5A
-                if b == b'\x5A':
+                # 等待包尾的第二个字节
+                if b == bytes([f1]):
                     # 完整包接收完成！
                     # 将像素数据转为列表发送给 QML
                     pixel_list = list(self._oled_data)
