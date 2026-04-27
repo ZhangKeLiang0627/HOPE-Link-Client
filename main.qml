@@ -8,7 +8,7 @@ ApplicationWindow {
     height: 600
     minimumWidth: 700
     minimumHeight: 500
-    title: "u8g2 OLED 仿真器 (128×64)"
+    title: "HOPE-Link Client"
     visible: true
 
     // Color scheme
@@ -600,7 +600,6 @@ ApplicationWindow {
                                 hoverEnabled: true
                                 onClicked: {
                                     pixelColor = modelData.color
-                                    pixelOffColor = "#001000"
                                     oledCanvas.requestPaint()
                                 }
                             }
@@ -766,17 +765,6 @@ ApplicationWindow {
                     }
                 }
 
-                // 发送请求帧按钮
-                CustomButton {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 32
-                    text: "发送请求帧"
-                    btnColor: accentColor
-                    enabled: serialBridge.connected
-                    onClicked: {
-                        serialBridge.send_hex_data("A5 A5")
-                    }
-                }
             }
         }
     }
