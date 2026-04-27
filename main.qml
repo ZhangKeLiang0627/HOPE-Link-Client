@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 
 ApplicationWindow {
     id: root
@@ -10,6 +11,10 @@ ApplicationWindow {
     minimumHeight: 500
     title: "HOPE-Link Client"
     visible: true
+    flags: Qt.Window | Qt.FramelessWindowHint
+
+    // 自定义标题栏高度
+    readonly property int titleBarHeight: 36
 
     // Color scheme
     readonly property color bgColor: "#1e1e2e"
@@ -45,10 +50,119 @@ ApplicationWindow {
     // 帧计数
     property int frameCount: 0
 
+    // ========== Custom Title Bar ==========
+    Rectangle {
+        id: titleBar
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: titleBarHeight
+        color: "#1a1a2e"
+
+        // 窗口拖动区域
+        MouseArea {
+            id: titleBarDragArea
+            anchors.fill: parent
+            property real lastMouseX: 0
+            property real lastMouseY: 0
+            onPressed: {
+                lastMouseX = mouseX
+                lastMouseY = mouseY
+            }
+            onMouseXChanged: {
+                if (pressed) {
+                    root.x += mouseX - lastMouseX
+                }
+            }
+            onMouseYChanged: {
+                if (pressed) {
+                    root.y += mouseY - lastMouseY
+                }
+            }
+            onDoubleClicked: {
+                if (root.visibility === Window.Maximized) {
+                    root.showNormal()
+                } else {
+                    root.showMaximized()
+                }
+            }
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 10
+            anchors.rightMargin: 0
+            spacing: 8
+
+            // 应用图标
+            Image {
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                source: "image-0.png"
+                fillMode: Image.PreserveAspectFit
+            }
+
+            // 标题文字
+            Text {
+                text: "HOPE-Link Client"
+                color: textColor
+                font.pixelSize: 13
+                font.bold: true
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // 最小化按钮
+            TitleBarButton {
+                text: "─"
+                onClicked: root.showMinimized()
+            }
+
+            // 最大化/还原按钮
+            TitleBarButton {
+                text: root.visibility === Window.Maximized ? "❐" : "□"
+                onClicked: {
+                    if (root.visibility === Window.Maximized) {
+                        root.showNormal()
+                    } else {
+                        root.showMaximized()
+                    }
+                }
+            }
+
+            // 关闭按钮
+            TitleBarButton {
+                id: closeBtn
+                isClose: true
+                onClicked: Qt.quit()
+                contentItem: Canvas {
+                    implicitWidth: 46
+                    implicitHeight: titleBarHeight
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.strokeStyle = closeBtn.containsMouse || closeBtn.pressed ? "#ffffff" : subTextColor
+                        ctx.lineWidth = 1.5
+                        var cx = width / 2
+                        var cy = height / 2
+                        var len = 7
+                        ctx.beginPath()
+                        ctx.moveTo(cx - len, cy - len)
+                        ctx.lineTo(cx + len, cy + len)
+                        ctx.moveTo(cx + len, cy - len)
+                        ctx.lineTo(cx - len, cy + len)
+                        ctx.stroke()
+                    }
+                }
+            }
+        }
+    }
+
     // ========== Top Toolbar ==========
     Rectangle {
         id: toolbar
-        anchors.top: parent.top
+        anchors.top: titleBar.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         height: fullScreenMode ? 0 : 50
@@ -813,6 +927,26 @@ ApplicationWindow {
     // Auto refresh ports on startup
     Component.onCompleted: {
         serialBridge.refresh_ports()
+    }
+
+    // ========== Title Bar Button Component ==========
+    component TitleBarButton : Button {
+        property bool isClose: false
+
+        implicitWidth: 46
+        implicitHeight: titleBarHeight
+
+        background: Rectangle {
+            color: parent.isClose ? (parent.pressed ? "#e81123" : parent.hovered ? "#e81123" : "transparent") :
+                                    (parent.pressed ? "#3a3a4e" : parent.hovered ? "#3a3a4e" : "transparent")
+        }
+        contentItem: Text {
+            text: parent.text
+            color: parent.isClose && (parent.pressed || parent.hovered) ? "#ffffff" : subTextColor
+            font.pixelSize: parent.isClose ? 12 : 14
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
     }
 
     // ========== Custom Button Component ==========

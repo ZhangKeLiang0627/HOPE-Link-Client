@@ -2,7 +2,7 @@ import sys
 import serial
 import serial.tools.list_ports
 from PySide6.QtCore import QObject, Signal, Slot, Property, QTimer, QByteArray
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 
 
@@ -241,6 +241,7 @@ class SerialBridge(QObject):
 
 def main():
     app = QGuiApplication(sys.argv)
+    app.setWindowIcon(QIcon("image-0.png"))
     engine = QQmlApplicationEngine()
 
     bridge = SerialBridge()
