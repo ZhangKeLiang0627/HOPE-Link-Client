@@ -58,21 +58,13 @@ ApplicationWindow {
     property bool isMaximized: false
 
     // ========== 窗口边缘拉伸区域 ==========
-    // 使用统一的鼠标事件处理，避免多个 MouseArea 重叠导致的抖动问题
-    // 通过 mouse.x/mouse.y 判断鼠标在窗口中的位置，决定拉伸方向
+    // 使用多个边缘 MouseArea，避免覆盖整个窗口导致 Windows 上 ComboBox 点击事件被拦截
+    // 每个边缘/角落使用独立的 MouseArea，只覆盖边缘区域
 
-    // 边缘拉伸检测区域（覆盖整个窗口，但只处理边缘区域的鼠标事件）
-    MouseArea {
-        id: resizeArea
-        anchors.fill: parent
-        hoverEnabled: true
-        enabled: !isMaximized && !fullScreenMode
-        propagateComposedEvents: true
-
-        // 拉伸方向: 0=无, 1=上, 2=下, 3=左, 4=右, 5=左上, 6=右上, 7=左下, 8=右下
+    // 工具函数：执行窗口拉伸
+    QtObject {
+        id: resizeHelper
         property int resizeDir: 0
-
-        // 记录按下时的状态
         property real pressScreenX: 0
         property real pressScreenY: 0
         property real pressWindowX: 0
@@ -80,129 +72,178 @@ ApplicationWindow {
         property real pressWidth: 0
         property real pressHeight: 0
 
-        // 判断鼠标是否在边缘区域
-        function getResizeDir(mx, my) {
-            var w = root.width
-            var h = root.height
-            var hw = resizeHandleWidth
-            var cw = resizeCornerWidth
-
-            var onTop = my < hw
-            var onBottom = my > h - hw
-            var onLeft = mx < hw
-            var onRight = mx > w - hw
-
-            // 角落优先判断
-            if (onTop && onLeft) return 5  // 左上
-            if (onTop && onRight) return 6  // 右上
-            if (onBottom && onLeft) return 7  // 左下
-            if (onBottom && onRight) return 8  // 右下
-            if (onTop) return 1  // 上
-            if (onBottom) return 2  // 下
-            if (onLeft) return 3  // 左
-            if (onRight) return 4  // 右
-            return 0  // 不在边缘
-        }
-
-        // 更新光标形状
-        function updateCursor(mx, my) {
-            var dir = getResizeDir(mx, my)
+        function startResize(dir, mouseX, mouseY) {
             resizeDir = dir
-            switch (dir) {
-                case 1: cursorShape = Qt.SizeVerCursor; break
-                case 2: cursorShape = Qt.SizeVerCursor; break
-                case 3: cursorShape = Qt.SizeHorCursor; break
-                case 4: cursorShape = Qt.SizeHorCursor; break
-                case 5: cursorShape = Qt.SizeFDiagCursor; break
-                case 6: cursorShape = Qt.SizeBDiagCursor; break
-                case 7: cursorShape = Qt.SizeBDiagCursor; break
-                case 8: cursorShape = Qt.SizeFDiagCursor; break
-                default: cursorShape = Qt.ArrowCursor; break
+            pressScreenX = root.x + mouseX
+            pressScreenY = root.y + mouseY
+            pressWindowX = root.x
+            pressWindowY = root.y
+            pressWidth = root.width
+            pressHeight = root.height
+        }
+
+        function doResize(mouseX, mouseY) {
+            if (resizeDir === 0) return
+            var dx = (root.x + mouseX) - pressScreenX
+            var dy = (root.y + mouseY) - pressScreenY
+
+            var newX = pressWindowX
+            var newY = pressWindowY
+            var newW = pressWidth
+            var newH = pressHeight
+
+            switch (resizeDir) {
+                case 1: // 上
+                    newY = pressWindowY + dy
+                    newH = pressHeight - dy
+                    break
+                case 2: // 下
+                    newH = pressHeight + dy
+                    break
+                case 3: // 左
+                    newX = pressWindowX + dx
+                    newW = pressWidth - dx
+                    break
+                case 4: // 右
+                    newW = pressWidth + dx
+                    break
+                case 5: // 左上
+                    newX = pressWindowX + dx
+                    newY = pressWindowY + dy
+                    newW = pressWidth - dx
+                    newH = pressHeight - dy
+                    break
+                case 6: // 右上
+                    newY = pressWindowY + dy
+                    newW = pressWidth + dx
+                    newH = pressHeight - dy
+                    break
+                case 7: // 左下
+                    newX = pressWindowX + dx
+                    newW = pressWidth - dx
+                    newH = pressHeight + dy
+                    break
+                case 8: // 右下
+                    newW = pressWidth + dx
+                    newH = pressHeight + dy
+                    break
+            }
+
+            if (newW >= root.minimumWidth && newH >= root.minimumHeight) {
+                root.x = newX
+                root.y = newY
+                root.width = newW
+                root.height = newH
             }
         }
 
-        onPositionChanged: function(mouse) {
-            if (pressed) {
-                // 正在拖拽拉伸
-                if (resizeDir !== 0) {
-                    var dx = (root.x + mouse.x) - pressScreenX
-                    var dy = (root.y + mouse.y) - pressScreenY
-
-                    var newX = pressWindowX
-                    var newY = pressWindowY
-                    var newW = pressWidth
-                    var newH = pressHeight
-
-                    switch (resizeDir) {
-                        case 1: // 上
-                            newY = pressWindowY + dy
-                            newH = pressHeight - dy
-                            break
-                        case 2: // 下
-                            newH = pressHeight + dy
-                            break
-                        case 3: // 左
-                            newX = pressWindowX + dx
-                            newW = pressWidth - dx
-                            break
-                        case 4: // 右
-                            newW = pressWidth + dx
-                            break
-                        case 5: // 左上
-                            newX = pressWindowX + dx
-                            newY = pressWindowY + dy
-                            newW = pressWidth - dx
-                            newH = pressHeight - dy
-                            break
-                        case 6: // 右上
-                            newY = pressWindowY + dy
-                            newW = pressWidth + dx
-                            newH = pressHeight - dy
-                            break
-                        case 7: // 左下
-                            newX = pressWindowX + dx
-                            newW = pressWidth - dx
-                            newH = pressHeight + dy
-                            break
-                        case 8: // 右下
-                            newW = pressWidth + dx
-                            newH = pressHeight + dy
-                            break
-                    }
-
-                    // 应用最小尺寸限制
-                    if (newW >= root.minimumWidth && newH >= root.minimumHeight) {
-                        root.x = newX
-                        root.y = newY
-                        root.width = newW
-                        root.height = newH
-                    }
-                }
-            } else {
-                // 鼠标移动，更新光标
-                updateCursor(mouse.x, mouse.y)
-            }
-        }
-
-        onPressed: function(mouse) {
-            var dir = getResizeDir(mouse.x, mouse.y)
-            if (dir !== 0) {
-                resizeDir = dir
-                pressScreenX = root.x + mouse.x
-                pressScreenY = root.y + mouse.y
-                pressWindowX = root.x
-                pressWindowY = root.y
-                pressWidth = root.width
-                pressHeight = root.height
-                mouse.accepted = true
-            } else {
-                mouse.accepted = false
-            }
-        }
-
-        onReleased: function(mouse) {
+        function endResize() {
             resizeDir = 0
         }
+    }
+
+    // 上边缘
+    MouseArea {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: resizeHandleWidth
+        cursorShape: Qt.SizeVerCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(1, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 下边缘
+    MouseArea {
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: resizeHandleWidth
+        cursorShape: Qt.SizeVerCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(2, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 左边缘
+    MouseArea {
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: resizeHandleWidth
+        cursorShape: Qt.SizeHorCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(3, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 右边缘
+    MouseArea {
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        width: resizeHandleWidth
+        cursorShape: Qt.SizeHorCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(4, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 左上角
+    MouseArea {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        width: resizeCornerWidth
+        height: resizeCornerWidth
+        cursorShape: Qt.SizeFDiagCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(5, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 右上角
+    MouseArea {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        width: resizeCornerWidth
+        height: resizeCornerWidth
+        cursorShape: Qt.SizeBDiagCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(6, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 左下角
+    MouseArea {
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: resizeCornerWidth
+        height: resizeCornerWidth
+        cursorShape: Qt.SizeBDiagCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(7, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
+    }
+
+    // 右下角
+    MouseArea {
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        width: resizeCornerWidth
+        height: resizeCornerWidth
+        cursorShape: Qt.SizeFDiagCursor
+        enabled: !isMaximized && !fullScreenMode
+        onPressed: function(mouse) { resizeHelper.startResize(8, mouse.x, mouse.y) }
+        onPositionChanged: function(mouse) { if (pressed) resizeHelper.doResize(mouse.x, mouse.y) }
+        onReleased: resizeHelper.endResize()
     }
 
     // ========== Custom Title Bar ==========
@@ -421,35 +462,56 @@ ApplicationWindow {
                     bottom: 1
                     top: 9999999
                 }
-                // 使用默认的 contentItem (TextInput)，只自定义背景和弹出列表
+                // 自定义 contentItem: TextInput 用于编辑
+                contentItem: TextInput {
+                    text: baudCombo.displayText
+                    font: baudCombo.font
+                    color: textColor
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: 8
+                    rightPadding: baudCombo.indicator.width + baudCombo.spacing
+                    // 当用户输入完成时，接受自定义值
+                    onAccepted: {
+                        baudCombo.currentIndex = -1  // 标记为自定义值
+                        baudCombo.editText = text
+                    }
+                }
                 background: Rectangle {
                     color: "#3a3a4e"
                     radius: 4
                     border.color: borderColor
                     border.width: 1
                 }
-                // 下拉箭头指示器
-                indicator: Item {
+                // 下拉箭头指示器 - 使用可点击的按钮区域
+                indicator: Rectangle {
                     x: parent.width - width
-                    width: 24
+                    width: 28
                     height: parent.height
-                    Rectangle {
+                    color: mouseArea.containsMouse ? "#4a4a5e" : "transparent"
+                    radius: 4
+
+                    Canvas {
                         anchors.centerIn: parent
                         width: 10
                         height: 6
-                        color: "transparent"
-                        Canvas {
-                            anchors.fill: parent
-                            onPaint: {
-                                var ctx = getContext("2d")
-                                ctx.fillStyle = subTextColor
-                                ctx.beginPath()
-                                ctx.moveTo(0, 0)
-                                ctx.lineTo(width, 0)
-                                ctx.lineTo(width / 2, height)
-                                ctx.closePath()
-                                ctx.fill()
-                            }
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.fillStyle = subTextColor
+                            ctx.beginPath()
+                            ctx.moveTo(0, 0)
+                            ctx.lineTo(width, 0)
+                            ctx.lineTo(width / 2, height)
+                            ctx.closePath()
+                            ctx.fill()
+                        }
+                    }
+
+                    MouseArea {
+                        id: mouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {
+                            baudCombo.popup.open()
                         }
                     }
                 }
@@ -481,6 +543,7 @@ ApplicationWindow {
                             }
                             onClicked: {
                                 baudCombo.currentIndex = index
+                                baudCombo.editText = modelData
                                 baudCombo.popup.close()
                             }
                         }
