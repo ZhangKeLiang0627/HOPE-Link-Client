@@ -469,7 +469,6 @@ ApplicationWindow {
                     color: textColor
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
-                    rightPadding: baudCombo.indicator.width + baudCombo.spacing
                     // 当用户输入完成时，接受自定义值
                     onAccepted: {
                         baudCombo.currentIndex = -1  // 标记为自定义值
@@ -482,12 +481,12 @@ ApplicationWindow {
                     border.color: borderColor
                     border.width: 1
                 }
-                // 下拉箭头指示器 - 使用可点击的按钮区域
+                // 指示器：使用 Rectangle + TapHandler 确保 Windows 上可点击
                 indicator: Rectangle {
                     x: parent.width - width
                     width: 28
                     height: parent.height
-                    color: mouseArea.containsMouse ? "#4a4a5e" : "transparent"
+                    color: indicatorTapHandler.pressed ? "#4a4a5e" : "transparent"
                     radius: 4
 
                     Canvas {
@@ -506,11 +505,10 @@ ApplicationWindow {
                         }
                     }
 
-                    MouseArea {
-                        id: mouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: {
+                    // 使用 TapHandler 替代 MouseArea，更可靠地处理点击事件
+                    TapHandler {
+                        id: indicatorTapHandler
+                        onTapped: {
                             baudCombo.popup.open()
                         }
                     }
