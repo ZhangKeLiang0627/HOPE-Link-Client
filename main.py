@@ -5,6 +5,10 @@ from PySide6.QtCore import QObject, Signal, Slot, Property, QTimer, QByteArray
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 
+from about import AboutDialog
+from settings import SettingsDialog
+from control import ControlDialog
+
 
 # OLED 参数
 OLED_WIDTH = 128
@@ -307,6 +311,16 @@ def main():
 
     bridge = SerialBridge()
     engine.rootContext().setContextProperty("serialBridge", bridge)
+
+    # Register dialog objects
+    about_dialog = AboutDialog(engine)
+    engine.rootContext().setContextProperty("aboutDialog", about_dialog)
+
+    settings_dialog = SettingsDialog(engine)
+    engine.rootContext().setContextProperty("settingsDialog", settings_dialog)
+
+    control_dialog = ControlDialog(engine)
+    engine.rootContext().setContextProperty("controlDialog", control_dialog)
 
     engine.load("main.qml")
 

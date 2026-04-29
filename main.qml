@@ -267,6 +267,42 @@ ApplicationWindow {
                 onClicked: serialBridge.refresh_ports()
             }
 
+            // Settings button
+            CustomButton {
+                id: settingsBtn
+                Layout.fillHeight: true
+                Layout.preferredWidth: 50
+                text: "设置"
+                font.pixelSize: 11
+                tooltip: "打开设置"
+                btnColor: subTextColor
+                onClicked: settingsDialog.show()
+            }
+
+            // About button
+            CustomButton {
+                id: aboutBtn
+                Layout.fillHeight: true
+                Layout.preferredWidth: 50
+                text: "关于"
+                font.pixelSize: 11
+                tooltip: "关于 HOPE-Link Client"
+                btnColor: subTextColor
+                onClicked: aboutDialog.show()
+            }
+
+            // Control button
+            CustomButton {
+                id: controlBtn
+                Layout.fillHeight: true
+                Layout.preferredWidth: 50
+                text: "控制"
+                font.pixelSize: 11
+                tooltip: "打开控制面板"
+                btnColor: subTextColor
+                onClicked: controlDialog.show()
+            }
+
             Item { Layout.fillWidth: true }
 
             // Connect / Disconnect button
