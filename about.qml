@@ -3,6 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 
+
+
 Window {
     id: aboutWindow
     width: 420
@@ -34,24 +36,21 @@ Window {
             width: parent.width - 40
 
             // Author Avatar
-            Rectangle {
+            Image {
                 Layout.alignment: Qt.AlignHCenter
-                width: 100
-                height: 100
-                radius: 50
-                color: surfaceColor
-                border.color: accentColor
-                border.width: 2
-                clip: true
-
-                Image {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    source: "avatar.png"
-
-                    fillMode: Image.PreserveAspectCrop
-                }
+                source: "avatar.png"
+                sourceSize.width: 100
+                sourceSize.height: 100
+                fillMode: Image.PreserveAspectCrop
             }
+
+
+
+
+
+
+
+
 
             // Author Name
             Text {

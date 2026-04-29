@@ -279,18 +279,6 @@ ApplicationWindow {
                 onClicked: settingsDialog.show()
             }
 
-            // About button
-            CustomButton {
-                id: aboutBtn
-                Layout.fillHeight: true
-                Layout.preferredWidth: 50
-                text: "关于"
-                font.pixelSize: 11
-                tooltip: "关于 HOPE-Link Client"
-                btnColor: subTextColor
-                onClicked: aboutDialog.show()
-            }
-
             // Control button
             CustomButton {
                 id: controlBtn
@@ -301,6 +289,18 @@ ApplicationWindow {
                 tooltip: "打开控制面板"
                 btnColor: subTextColor
                 onClicked: controlDialog.show()
+            }
+
+            // About button
+            CustomButton {
+                id: aboutBtn
+                Layout.fillHeight: true
+                Layout.preferredWidth: 50
+                text: "关于"
+                font.pixelSize: 11
+                tooltip: "关于 HOPE-Link Client"
+                btnColor: subTextColor
+                onClicked: aboutDialog.show()
             }
 
             Item { Layout.fillWidth: true }
@@ -1093,12 +1093,65 @@ ApplicationWindow {
         property color btnColor: accentColor
         property string tooltip: ""
 
+        // 鼠标悬停状态
+        property bool hoveredState: false
+
+        // 动画属性：渐变透明度（带动画过渡）
+        property real hoverGlow: 0.0
+
+        Behavior on hoverGlow {
+            NumberAnimation {
+                duration: 250
+                easing.type: Easing.OutCubic
+            }
+        }
+
         background: Rectangle {
-            color: parent.enabled ? (parent.pressed ? Qt.darker(btnColor, 1.3) :
-                                     parent.hovered ? Qt.lighter(btnColor, 1.1) : btnColor) : "#3a3a4e"
+            id: bgRect
             radius: 4
             opacity: parent.enabled ? 1.0 : 0.5
+
+            // 基础颜色
+            color: parent.enabled ? (parent.pressed ? Qt.darker(btnColor, 1.3) : btnColor) : "#3a3a4e"
+
+            // 悬停渐变叠加层
+            Rectangle {
+                anchors.fill: parent
+                radius: 4
+                visible: parent.parent.hoveredState
+                opacity: parent.parent.hoverGlow
+
+                // 渐变背景
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: Qt.lighter(btnColor, 1.3) }
+                    GradientStop { position: 0.5; color: Qt.lighter(btnColor, 1.5) }
+                    GradientStop { position: 1.0; color: Qt.lighter(btnColor, 1.3) }
+                }
+
+                // 边框发光效果
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 4
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.3 * parent.parent.hoverGlow)
+                }
+            }
+
+            // 底部高光线（悬停时显示）
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 2
+                radius: 1
+                visible: parent.parent.hoveredState
+                opacity: parent.parent.hoverGlow * 0.6
+                color: Qt.lighter(btnColor, 1.8)
+            }
         }
+
         contentItem: Text {
             text: parent.text
             color: parent.enabled ? "#1e1e2e" : subTextColor
@@ -1107,6 +1160,25 @@ ApplicationWindow {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
+
+        // 鼠标悬停检测
+        MouseArea {
+            id: internalMouseArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.NoButton  // 不拦截按钮点击事件
+
+            onEntered: {
+                parent.hoveredState = true
+                parent.hoverGlow = 1.0
+            }
+            onExited: {
+                parent.hoveredState = false
+                parent.hoverGlow = 0.0
+            }
+        }
+
         ToolTip {
             visible: parent.hovered && tooltip.length > 0
             text: tooltip
