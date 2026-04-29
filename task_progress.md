@@ -1,7 +1,0 @@
-- [x] Analyze existing code structure
-- [ ] Create about.py and about.qml for the About dialog
-- [ ] Create settings.py and settings.qml for the Settings dialog
-- [ ] Create control.py and control.qml for the Control dialog
-- [ ] Add buttons (设置, 关于, 控制) to main.qml toolbar
-- [ ] Update main.py to register new windows
-- [ ] Test the application
