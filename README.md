@@ -15,12 +15,14 @@ conda activate pyside6
 # 安装pyside6组件
 pip install pyside6
 
-# 安装X11相关依赖
+# 安装pyserial
+pip install pyserial
+
+# Ubuntu安装X11相关依赖
 sudo apt install libxcb-cursor0 libxcb-xinerama0 libxcb-randr0 libxcb-render0 libxcb-shape0 libxcb-xfixes0 libxcb-xkb-dev libxkbcommon-x11-0
 ```
 
 - thanks：https://www.cnblogs.com/mthoutai/p/19613677
-
 
 
 ## Ubuntu的Serial权限问题
@@ -37,4 +39,15 @@ whoami
 sudo usermod -aG dialout hugokkl
 
 # 然后重启系统，即可
+```
+
+## Pack
+
+```shell
+pip install pyinstaller
+
+pyinstaller --onefile --name="HOPE-Link-Client" --icon=icon.ico --add-data "main.qml;." --add-data "image-0.png;." --collect-all PySide6 main.py
+
+# 不带窗体调试
+pyinstaller --onefile --windowed --name="HOPE-Link-Client" --icon=icon.ico --add-data "main.qml;." --add-data "image-0.png;." --collect-all PySide6 main.py
 ```
