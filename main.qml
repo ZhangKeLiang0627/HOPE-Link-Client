@@ -82,27 +82,36 @@ ApplicationWindow {
                     leftPadding: 8
                     elide: Text.ElideRight
                 }
-                indicator: Item {
+                indicator: Rectangle {
                     x: parent.width - width
-                    width: 30
+                    width: 40
                     height: parent.height
-                    Rectangle {
+                    color: portIndicatorMouseArea.containsMouse ? "#4a4a5e" : "transparent"
+                    radius: 4
+
+                    Canvas {
                         anchors.centerIn: parent
                         width: 10
                         height: 6
-                        color: "transparent"
-                        Canvas {
-                            anchors.fill: parent
-                            onPaint: {
-                                var ctx = getContext("2d")
-                                ctx.fillStyle = subTextColor
-                                ctx.beginPath()
-                                ctx.moveTo(0, 0)
-                                ctx.lineTo(width, 0)
-                                ctx.lineTo(width / 2, height)
-                                ctx.closePath()
-                                ctx.fill()
-                            }
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.fillStyle = subTextColor
+                            ctx.beginPath()
+                            ctx.moveTo(0, 0)
+                            ctx.lineTo(width, 0)
+                            ctx.lineTo(width / 2, height)
+                            ctx.closePath()
+                            ctx.fill()
+                        }
+                    }
+
+                    MouseArea {
+                        id: portIndicatorMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            portCombo.popup.open()
                         }
                     }
                 }
@@ -154,12 +163,15 @@ ApplicationWindow {
                     top: 9999999
                 }
                 // 自定义 contentItem: TextInput 用于编辑
+                // 注意：必须设置 rightPadding 让出指示器区域，否则 Windows 上 TextInput
+                // 会覆盖指示器导致三角符号无法点击（光标变为 I-beam）
                 contentItem: TextInput {
                     text: baudCombo.displayText
                     font: baudCombo.font
                     color: textColor
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
+                    rightPadding: 44  // 让出指示器区域（40px + 4px 间距）
                     // 当用户输入完成时，接受自定义值
                     onAccepted: {
                         baudCombo.currentIndex = -1  // 标记为自定义值
@@ -172,12 +184,14 @@ ApplicationWindow {
                     border.color: borderColor
                     border.width: 1
                 }
-                // 指示器：使用 Rectangle + TapHandler 确保 Windows 上可点击
+                // 指示器：使用较大的可点击区域，确保三角符号位置也能点击下拉
+                // 设置 z 值高于 contentItem，确保 Windows 上也能正确捕获鼠标事件
                 indicator: Rectangle {
                     x: parent.width - width
-                    width: 28
+                    width: 40
                     height: parent.height
-                    color: indicatorTapHandler.pressed ? "#4a4a5e" : "transparent"
+                    z: 2
+                    color: indicatorMouseArea.containsMouse ? "#4a4a5e" : "transparent"
                     radius: 4
 
                     Canvas {
@@ -196,10 +210,13 @@ ApplicationWindow {
                         }
                     }
 
-                    // 使用 TapHandler 替代 MouseArea，更可靠地处理点击事件
-                    TapHandler {
-                        id: indicatorTapHandler
-                        onTapped: {
+                    // 使用 MouseArea 覆盖整个指示器区域，确保三角符号位置也能点击
+                    MouseArea {
+                        id: indicatorMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
                             baudCombo.popup.open()
                         }
                     }
