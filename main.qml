@@ -7,7 +7,7 @@ ApplicationWindow {
     id: root
     width: 800
     height: 600
-    minimumWidth: 700
+    minimumWidth: 800
     minimumHeight: 500
     title: "HOPE-Link Client"
     visible: true
