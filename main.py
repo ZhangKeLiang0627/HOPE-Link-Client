@@ -309,6 +309,8 @@ def main():
     app.setWindowIcon(QIcon("image-0.png"))
     engine = QQmlApplicationEngine()
 
+    # Keep strong references to prevent garbage collection
+    # PySide6 context properties can be garbage collected if not properly referenced
     bridge = SerialBridge()
     engine.rootContext().setContextProperty("serialBridge", bridge)
 
@@ -321,6 +323,12 @@ def main():
 
     control_dialog = ControlDialog(engine)
     engine.rootContext().setContextProperty("controlDialog", control_dialog)
+
+    # Store references on the engine to prevent garbage collection
+    engine._bridge = bridge
+    engine._about_dialog = about_dialog
+    engine._settings_dialog = settings_dialog
+    engine._control_dialog = control_dialog
 
     engine.load("main.qml")
 

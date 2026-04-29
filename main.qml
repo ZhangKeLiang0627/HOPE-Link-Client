@@ -66,7 +66,7 @@ ApplicationWindow {
                 id: portCombo
                 Layout.preferredWidth: 220
                 Layout.fillHeight: true
-                model: serialBridge.ports
+                model: serialBridge ? serialBridge.ports : []
                 currentIndex: -1
                 displayText: currentIndex >= 0 ? currentText : "选择串口..."
                 background: Rectangle {
@@ -155,7 +155,7 @@ ApplicationWindow {
                 id: baudCombo
                 Layout.preferredWidth: 120
                 Layout.fillHeight: true
-                model: serialBridge.baudRates
+                model: serialBridge ? serialBridge.baudRates : []
                 currentIndex: 4  // 115200
                 editable: true
                 validator: IntValidator {
@@ -264,7 +264,7 @@ ApplicationWindow {
                 Layout.preferredWidth: 36
                 text: "↻"
                 tooltip: "刷新串口列表"
-                onClicked: serialBridge.refresh_ports()
+                onClicked: { if (serialBridge) serialBridge.refresh_ports() }
             }
 
             // Settings button
@@ -310,10 +310,11 @@ ApplicationWindow {
                 id: connectBtn
                 Layout.fillHeight: true
                 Layout.preferredWidth: 100
-                text: serialBridge.connected ? "断开连接" : "打开串口"
-                btnColor: serialBridge.connected ? errorColor : successColor
-                enabled: serialBridge.connected || portCombo.count > 0
+                text: serialBridge && serialBridge.connected ? "断开连接" : "打开串口"
+                btnColor: serialBridge && serialBridge.connected ? errorColor : successColor
+                enabled: (serialBridge && serialBridge.connected) || portCombo.count > 0
                 onClicked: {
+                    if (!serialBridge) return
                     if (serialBridge.connected) {
                         serialBridge.disconnect_port()
                     } else {
@@ -369,8 +370,8 @@ ApplicationWindow {
                     }
                     Item { Layout.fillWidth: true }
                     Text {
-                        text: serialBridge.connected ? "● 已连接" : "○ 未连接"
-                        color: serialBridge.connected ? successColor : errorColor
+                        text: serialBridge && serialBridge.connected ? "● 已连接" : "○ 未连接"
+                        color: serialBridge && serialBridge.connected ? successColor : errorColor
                         font.pixelSize: 12
                     }
                 }
@@ -529,7 +530,7 @@ ApplicationWindow {
                         onClicked: {
                             oledBuffer = []
                             oledCanvas.requestPaint()
-                            serialBridge.clear_buffer()
+                            if (serialBridge) serialBridge.clear_buffer()
                         }
                     }
                 }
@@ -611,8 +612,8 @@ ApplicationWindow {
                                     Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
                                     Text {
                                         text: {
-                                            var h = serialBridge.pkgHeader
-                                            if (h.length === 4) {
+                                            var h = serialBridge ? serialBridge.pkgHeader : "A5A5"
+                                            if (h && h.length === 4) {
                                                 return "0x" + h.substring(0, 2) + " 0x" + h.substring(2, 4)
                                             }
                                             return "0xA5 0xA5"
@@ -642,8 +643,8 @@ ApplicationWindow {
                                     Text { text: ":"; color: subTextColor; font.pixelSize: 11 }
                                     Text {
                                         text: {
-                                            var f = serialBridge.pkgFooter
-                                            if (f.length === 4) {
+                                            var f = serialBridge ? serialBridge.pkgFooter : "5A5A"
+                                            if (f && f.length === 4) {
                                                 return "0x" + f.substring(0, 2) + " 0x" + f.substring(2, 4)
                                             }
                                             return "0x5A 0x5A"
@@ -683,7 +684,7 @@ ApplicationWindow {
                                     id: headerInput
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 24
-                                    text: serialBridge.pkgHeader
+                                    text: serialBridge ? serialBridge.pkgHeader : "A5A5"
                                     color: textColor
                                     font.family: "monospace"
                                     font.pixelSize: 11
@@ -700,6 +701,7 @@ ApplicationWindow {
                                         regularExpression: /[0-9a-fA-F]{0,4}/
                                     }
                                     onEditingFinished: {
+                                        if (!serialBridge) return
                                         var val = text.trim().toUpperCase()
                                         if (val.length === 4) {
                                             serialBridge.pkgHeader = val
@@ -714,6 +716,7 @@ ApplicationWindow {
                                     font.pixelSize: 11
                                     tooltip: "应用包头"
                                     onClicked: {
+                                        if (!serialBridge) return
                                         var val = headerInput.text.trim().toUpperCase()
                                         if (val.length === 4) {
                                             serialBridge.pkgHeader = val
@@ -739,7 +742,7 @@ ApplicationWindow {
                                     id: footerInput
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 24
-                                    text: serialBridge.pkgFooter
+                                    text: serialBridge ? serialBridge.pkgFooter : "5A5A"
                                     color: textColor
                                     font.family: "monospace"
                                     font.pixelSize: 11
@@ -756,6 +759,7 @@ ApplicationWindow {
                                         regularExpression: /[0-9a-fA-F]{0,4}/
                                     }
                                     onEditingFinished: {
+                                        if (!serialBridge) return
                                         var val = text.trim().toUpperCase()
                                         if (val.length === 4) {
                                             serialBridge.pkgFooter = val
@@ -770,6 +774,7 @@ ApplicationWindow {
                                     font.pixelSize: 11
                                     tooltip: "应用包尾"
                                     onClicked: {
+                                        if (!serialBridge) return
                                         var val = footerInput.text.trim().toUpperCase()
                                         if (val.length === 4) {
                                             serialBridge.pkgFooter = val
@@ -819,8 +824,8 @@ ApplicationWindow {
                                 color: textColor; font.pixelSize: 11; leftPadding: 8
                             }
                             Text {
-                                text: "• 串口: " + (serialBridge.connected ? "已连接" : "未连接")
-                                color: serialBridge.connected ? "#a6e3a1" : "#f38ba8"
+                                text: "• 串口: " + (serialBridge && serialBridge.connected ? "已连接" : "未连接")
+                                color: serialBridge && serialBridge.connected ? "#a6e3a1" : "#f38ba8"
                                 font.pixelSize: 11; leftPadding: 8
                             }
 
@@ -1057,11 +1062,11 @@ ApplicationWindow {
                 width: 8
                 height: 8
                 radius: 4
-                color: serialBridge.connected ? successColor : errorColor
+                color: serialBridge && serialBridge.connected ? successColor : errorColor
             }
 
             Text {
-                text: serialBridge.statusMessage || "就绪"
+                text: serialBridge && serialBridge.statusMessage ? serialBridge.statusMessage : "就绪"
                 color: subTextColor
                 font.pixelSize: 12
                 verticalAlignment: Text.AlignVCenter
@@ -1070,8 +1075,8 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
 
             Text {
-                text: serialBridge.connected ? "已连接" : "未连接"
-                color: serialBridge.connected ? successColor : errorColor
+                text: serialBridge && serialBridge.connected ? "已连接" : "未连接"
+                color: serialBridge && serialBridge.connected ? successColor : errorColor
                 font.pixelSize: 12
                 font.bold: true
             }
