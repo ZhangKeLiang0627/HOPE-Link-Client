@@ -6,8 +6,11 @@ import QtQuick.Window
 Window {
     id: aboutWindow
     width: 420
-    height: 520
+    height: 440
+
+
     title: "关于"
+
     modality: Qt.ApplicationModal
     flags: Qt.Dialog | Qt.WindowCloseButtonHint | Qt.WindowTitleHint
 
@@ -44,7 +47,8 @@ Window {
                 Image {
                     anchors.fill: parent
                     anchors.margins: 4
-                    source: "image-0.png"
+                    source: "avatar.png"
+
                     fillMode: Image.PreserveAspectCrop
                 }
             }
@@ -103,125 +107,13 @@ Window {
                 }
             }
 
-            // QR Code Section
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                text: "项目二维码"
-                color: subTextColor
-                font.pixelSize: 13
-            }
-
-            // QR Code Display
-            Rectangle {
-                Layout.alignment: Qt.AlignHCenter
-                width: 160
-                height: 160
-                color: "white"
-                radius: 8
-                border.color: borderColor
-                border.width: 1
-
-                Canvas {
-                    id: qrCanvas
-                    anchors.fill: parent
-                    anchors.margins: 8
-
-                    onPaint: {
-                        var ctx = getContext("2d")
-                        if (!ctx) return
-
-                        var url = "https://github.com/ZhangKeLiang0627/HOPE-Link-Client"
-
-                        // Generate a simple QR-like pattern using the URL as seed
-                        // This creates a visually recognizable QR-code style pattern
-                        var seed = 0
-                        for (var i = 0; i < url.length; i++) {
-                            seed = ((seed << 5) - seed) + url.charCodeAt(i)
-                            seed = seed & seed
-                        }
-
-                        var size = width
-                        var modules = 21  // QR code version 1 is 21x21
-                        var moduleSize = size / modules
-
-                        // Draw white background
-                        ctx.fillStyle = "white"
-                        ctx.fillRect(0, 0, size, size)
-
-                        // Draw finder patterns (top-left, top-right, bottom-left)
-                        ctx.fillStyle = "black"
-
-                        // Helper to draw a finder pattern
-                        function drawFinderPattern(startX, startY) {
-                            // Outer 7x7
-                            ctx.fillRect(startX, startY, 7 * moduleSize, 7 * moduleSize)
-                            // Inner 5x5 white
-                            ctx.fillStyle = "white"
-                            ctx.fillRect(startX + moduleSize, startY + moduleSize, 5 * moduleSize, 5 * moduleSize)
-                            // Inner 3x3 black
-                            ctx.fillStyle = "black"
-                            ctx.fillRect(startX + 2 * moduleSize, startY + 2 * moduleSize, 3 * moduleSize, 3 * moduleSize)
-                            ctx.fillStyle = "black"
-                        }
-
-                        drawFinderPattern(0, 0)
-                        drawFinderPattern((modules - 7) * moduleSize, 0)
-                        drawFinderPattern(0, (modules - 7) * moduleSize)
-
-                        // Draw timing patterns
-                        ctx.fillStyle = "black"
-                        for (var t = 8; t < modules - 8; t++) {
-                            if (t % 2 === 0) {
-                                ctx.fillRect(t * moduleSize, 6 * moduleSize, moduleSize, moduleSize)
-                                ctx.fillRect(6 * moduleSize, t * moduleSize, moduleSize, moduleSize)
-                            }
-                        }
-
-                        // Draw data modules based on URL hash
-                        ctx.fillStyle = "black"
-                        var pseudoRandom = seed
-                        for (var row = 0; row < modules; row++) {
-                            for (var col = 0; col < modules; col++) {
-                                // Skip finder patterns and timing patterns
-                                if ((row < 8 && col < 8) ||
-                                    (row < 8 && col >= modules - 8) ||
-                                    (row >= modules - 8 && col < 8) ||
-                                    row === 6 || col === 6) {
-                                    continue
-                                }
-
-                                pseudoRandom = ((pseudoRandom * 1103515245) + 12345) & 0x7fffffff
-                                if (pseudoRandom % 3 === 0) {
-                                    ctx.fillRect(col * moduleSize, row * moduleSize, moduleSize, moduleSize)
-                                }
-                            }
-                        }
-
-                        // Draw a small center indicator
-                        ctx.fillStyle = accentColor
-                        ctx.globalAlpha = 0.3
-                        ctx.fillRect(9 * moduleSize, 9 * moduleSize, 3 * moduleSize, 3 * moduleSize)
-                        ctx.globalAlpha = 1.0
-                    }
-                }
-
-                // Tooltip explaining the QR code
-                Text {
-                    anchors.bottom: parent.bottom
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottomMargin: 4
-                    text: "扫码访问项目"
-                    color: "#666666"
-                    font.pixelSize: 10
-                }
-            }
-
             // Version info
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 text: "HOPE-Link Client v1.0"
                 color: subTextColor
                 font.pixelSize: 11
+
             }
 
             // Close button
