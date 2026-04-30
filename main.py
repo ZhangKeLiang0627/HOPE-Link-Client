@@ -33,6 +33,9 @@ class SerialBridge(QObject):
     oledFrameReady = Signal(list)  # 发送 1024 字节像素数据列表
     pkgHeaderChanged = Signal()
     pkgFooterChanged = Signal()
+    rawDataReceived = Signal(str)  # 串口监视器收到的原始数据（十六进制）
+    rawTextReceived = Signal(str)  # 串口监视器收到的文本数据
+    monitorCleared = Signal()      # 监视器清空信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -222,6 +225,13 @@ class SerialBridge(QObject):
         self._oled_data = bytearray()
         self._oled_data_count = 0
 
+    @Slot()
+    def clear_monitor(self):
+        """Clear the serial monitor display."""
+        self._buffer = b""
+        self.monitorCleared.emit()
+        self._set_status("监视器已清空")
+
     # ---------- Internal methods ----------
 
     def _parse_oled_packet(self, data):
@@ -296,6 +306,15 @@ class SerialBridge(QObject):
                 data = self._serial_port.read(self._serial_port.in_waiting)
                 # 直接解析 OLED 协议包
                 self._parse_oled_packet(data)
+                # 同时发送原始数据到串口监视器
+                hex_str = data.hex().upper()
+                self.rawDataReceived.emit(hex_str)
+                # 尝试以文本形式发送（过滤不可见字符）
+                try:
+                    text = data.decode("utf-8", errors="replace")
+                    self.rawTextReceived.emit(text)
+                except Exception:
+                    pass
         except Exception:
             pass
 
