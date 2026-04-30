@@ -20,13 +20,13 @@ Window {
     readonly property color darkSubTextColor: "#a6adc8"
     readonly property color darkBorderColor: "#45475a"
 
-    // Light theme colors
-    readonly property color lightBgColor: "#f5f5f5"
-    readonly property color lightSurfaceColor: "#ffffff"
-    readonly property color lightAccentColor: "#4a6cf7"
-    readonly property color lightTextColor: "#1a1a2e"
-    readonly property color lightSubTextColor: "#6b7280"
-    readonly property color lightBorderColor: "#d1d5db"
+    // Light theme colors (米白色系)
+    readonly property color lightBgColor: "#f5f0eb"
+    readonly property color lightSurfaceColor: "#faf7f2"
+    readonly property color lightAccentColor: "#4f6ef7"
+    readonly property color lightTextColor: "#2c2c2c"
+    readonly property color lightSubTextColor: "#78716c"
+    readonly property color lightBorderColor: "#d6d0c8"
 
     // Current theme colors (reactive to themeManager.isDark)
     property color bgColor: themeManager && themeManager.isDark ? darkBgColor : lightBgColor

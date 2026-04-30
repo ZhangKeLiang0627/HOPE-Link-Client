@@ -25,17 +25,17 @@ ApplicationWindow {
     readonly property color darkInputBgColor: "#3a3a4e"
     readonly property color darkMonitorBgColor: "#1a1a2e"
 
-    // Light theme colors
-    readonly property color lightBgColor: "#f5f5f5"
-    readonly property color lightSurfaceColor: "#ffffff"
-    readonly property color lightAccentColor: "#4a6cf7"
-    readonly property color lightTextColor: "#1a1a2e"
-    readonly property color lightSubTextColor: "#6b7280"
+    // Light theme colors (米白色系)
+    readonly property color lightBgColor: "#f5f0eb"
+    readonly property color lightSurfaceColor: "#faf7f2"
+    readonly property color lightAccentColor: "#4f6ef7"
+    readonly property color lightTextColor: "#2c2c2c"
+    readonly property color lightSubTextColor: "#78716c"
     readonly property color lightErrorColor: "#dc2626"
     readonly property color lightSuccessColor: "#16a34a"
-    readonly property color lightBorderColor: "#d1d5db"
-    readonly property color lightInputBgColor: "#e5e7eb"
-    readonly property color lightMonitorBgColor: "#f9fafb"
+    readonly property color lightBorderColor: "#d6d0c8"
+    readonly property color lightInputBgColor: "#e8e2da"
+    readonly property color lightMonitorBgColor: "#fdfbf8"
 
     // Current theme colors (reactive to themeManager.isDark)
     property color bgColor: themeManager && themeManager.isDark ? darkBgColor : lightBgColor
@@ -339,43 +339,51 @@ ApplicationWindow {
             // Theme toggle switch (白天/黑夜模式)
             Rectangle {
                 Layout.fillHeight: true
-                Layout.preferredWidth: 80
+                Layout.preferredWidth: 90
                 color: "transparent"
 
-                RowLayout {
+                Item {
                     anchors.centerIn: parent
-                    spacing: 6
+                    width: 72
+                    height: 32
 
-                    Text {
-                        text: themeManager && themeManager.isDark ? "🌙" : "☀️"
-                        font.pixelSize: 14
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
+                    // 开关背景轨道
                     Rectangle {
                         id: themeSwitch
-                        width: 36
-                        height: 20
-                        radius: 10
-                        color: themeManager && themeManager.isDark ? "#4a6cf7" : "#9ca3af"
-                        border.color: borderColor
+                        anchors.centerIn: parent
+                        width: 52
+                        height: 28
+                        radius: 14
+                        color: themeManager && themeManager.isDark ? "#4a6cf7" : "#c4bdb5"
+                        border.color: themeManager && themeManager.isDark ? Qt.lighter("#4a6cf7", 1.2) : "#b8b0a8"
                         border.width: 1
 
                         Behavior on color {
                             ColorAnimation { duration: 200 }
                         }
+                        Behavior on border.color {
+                            ColorAnimation { duration: 200 }
+                        }
 
+                        // 白色圆形滑块（带图标）
                         Rectangle {
                             id: themeSwitchKnob
-                            x: themeManager && themeManager.isDark ? 18 : 2
-                            y: 2
-                            width: 14
-                            height: 14
-                            radius: 7
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: themeManager && themeManager.isDark ? 26 : 2
+                            width: 24
+                            height: 24
+                            radius: 12
                             color: "#ffffff"
 
                             Behavior on x {
                                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                            }
+
+                            // 滑块上的图标
+                            Text {
+                                anchors.centerIn: parent
+                                text: themeManager && themeManager.isDark ? "🌙" : "☀️"
+                                font.pixelSize: 13
                             }
                         }
 
@@ -389,28 +397,28 @@ ApplicationWindow {
                             }
                         }
                     }
-                }
 
-                ToolTip {
-                    text: themeManager && themeManager.isDark ? "切换到白天模式" : "切换到黑夜模式"
-                    delay: 500
-                    visible: themeSwitchMouseArea.containsMouse
-                    background: Rectangle {
-                        color: surfaceColor
-                        border.color: borderColor
-                        radius: 4
-                    }
-                    contentItem: Text {
+                    ToolTip {
                         text: themeManager && themeManager.isDark ? "切换到白天模式" : "切换到黑夜模式"
-                        color: textColor
+                        delay: 500
+                        visible: themeSwitchMouseArea.containsMouse
+                        background: Rectangle {
+                            color: surfaceColor
+                            border.color: borderColor
+                            radius: 4
+                        }
+                        contentItem: Text {
+                            text: themeManager && themeManager.isDark ? "切换到白天模式" : "切换到黑夜模式"
+                            color: textColor
+                        }
                     }
-                }
 
-                MouseArea {
-                    id: themeSwitchMouseArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.NoButton
+                    MouseArea {
+                        id: themeSwitchMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                    }
                 }
             }
 
