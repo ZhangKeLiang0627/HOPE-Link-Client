@@ -12,15 +12,52 @@ ApplicationWindow {
     title: "HOPE-Link Client"
     visible: true
 
-    // Color scheme
-    readonly property color bgColor: "#1e1e2e"
-    readonly property color surfaceColor: "#2a2a3e"
-    readonly property color accentColor: "#89b4fa"
-    readonly property color textColor: "#cdd6f4"
-    readonly property color subTextColor: "#a6adc8"
-    readonly property color errorColor: "#f38ba8"
-    readonly property color successColor: "#a6e3a1"
-    readonly property color borderColor: "#45475a"
+    // ========== Theme System ==========
+    // Dark theme colors (default)
+    readonly property color darkBgColor: "#1e1e2e"
+    readonly property color darkSurfaceColor: "#2a2a3e"
+    readonly property color darkAccentColor: "#89b4fa"
+    readonly property color darkTextColor: "#cdd6f4"
+    readonly property color darkSubTextColor: "#a6adc8"
+    readonly property color darkErrorColor: "#f38ba8"
+    readonly property color darkSuccessColor: "#a6e3a1"
+    readonly property color darkBorderColor: "#45475a"
+    readonly property color darkInputBgColor: "#3a3a4e"
+    readonly property color darkMonitorBgColor: "#1a1a2e"
+
+    // Light theme colors
+    readonly property color lightBgColor: "#f5f5f5"
+    readonly property color lightSurfaceColor: "#ffffff"
+    readonly property color lightAccentColor: "#4a6cf7"
+    readonly property color lightTextColor: "#1a1a2e"
+    readonly property color lightSubTextColor: "#6b7280"
+    readonly property color lightErrorColor: "#dc2626"
+    readonly property color lightSuccessColor: "#16a34a"
+    readonly property color lightBorderColor: "#d1d5db"
+    readonly property color lightInputBgColor: "#e5e7eb"
+    readonly property color lightMonitorBgColor: "#f9fafb"
+
+    // Current theme colors (reactive to themeManager.isDark)
+    property color bgColor: themeManager && themeManager.isDark ? darkBgColor : lightBgColor
+    property color surfaceColor: themeManager && themeManager.isDark ? darkSurfaceColor : lightSurfaceColor
+    property color accentColor: themeManager && themeManager.isDark ? darkAccentColor : lightAccentColor
+    property color textColor: themeManager && themeManager.isDark ? darkTextColor : lightTextColor
+    property color subTextColor: themeManager && themeManager.isDark ? darkSubTextColor : lightSubTextColor
+    property color errorColor: themeManager && themeManager.isDark ? darkErrorColor : lightErrorColor
+    property color successColor: themeManager && themeManager.isDark ? darkSuccessColor : lightSuccessColor
+    property color borderColor: themeManager && themeManager.isDark ? darkBorderColor : lightBorderColor
+    property color inputBgColor: themeManager && themeManager.isDark ? darkInputBgColor : lightInputBgColor
+    property color monitorBgColor: themeManager && themeManager.isDark ? darkMonitorBgColor : lightMonitorBgColor
+
+    // Update colors when theme changes
+    Connections {
+        target: themeManager
+        function onThemeChanged() {
+            // Force property re-evaluation by toggling a dummy property
+            // The property bindings above will automatically update
+            console.log("Theme changed to:", themeManager.isDark ? "dark" : "light")
+        }
+    }
 
     // OLED 参数
     readonly property int oledWidth: 128
@@ -73,7 +110,7 @@ ApplicationWindow {
                 currentIndex: -1
                 displayText: currentIndex >= 0 ? currentText : "选择串口..."
                 background: Rectangle {
-                    color: parent.enabled ? "#3a3a4e" : "#2a2a3e"
+                    color: parent.enabled ? inputBgColor : surfaceColor
                     radius: 4
                     border.color: borderColor
                     border.width: 1
@@ -178,7 +215,7 @@ ApplicationWindow {
                     }
                 }
                 background: Rectangle {
-                    color: "#3a3a4e"
+                    color: inputBgColor
                     radius: 4
                     border.color: borderColor
                     border.width: 1
@@ -297,6 +334,84 @@ ApplicationWindow {
                 tooltip: "关于 HOPE-Link Client"
                 btnColor: subTextColor
                 onClicked: aboutDialog.show()
+            }
+
+            // Theme toggle switch (白天/黑夜模式)
+            Rectangle {
+                Layout.fillHeight: true
+                Layout.preferredWidth: 80
+                color: "transparent"
+
+                RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Text {
+                        text: themeManager && themeManager.isDark ? "🌙" : "☀️"
+                        font.pixelSize: 14
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    Rectangle {
+                        id: themeSwitch
+                        width: 36
+                        height: 20
+                        radius: 10
+                        color: themeManager && themeManager.isDark ? "#4a6cf7" : "#9ca3af"
+                        border.color: borderColor
+                        border.width: 1
+
+                        Behavior on color {
+                            ColorAnimation { duration: 200 }
+                        }
+
+                        Rectangle {
+                            id: themeSwitchKnob
+                            x: themeManager && themeManager.isDark ? 18 : 2
+                            y: 2
+                            width: 14
+                            height: 14
+                            radius: 7
+                            color: "#ffffff"
+
+                            Behavior on x {
+                                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (themeManager) {
+                                    themeManager.toggle()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ToolTip {
+                    text: themeManager && themeManager.isDark ? "切换到白天模式" : "切换到黑夜模式"
+                    delay: 500
+                    visible: themeSwitchMouseArea.containsMouse
+                    background: Rectangle {
+                        color: surfaceColor
+                        border.color: borderColor
+                        radius: 4
+                    }
+                    contentItem: Text {
+                        text: themeManager && themeManager.isDark ? "切换到白天模式" : "切换到黑夜模式"
+                        color: textColor
+                    }
+                }
+
+                MouseArea {
+                    id: themeSwitchMouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                }
             }
 
             Item { Layout.fillWidth: true }
@@ -640,7 +755,7 @@ ApplicationWindow {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        color: "#1a1a2e"
+                        color: monitorBgColor
                         radius: 4
                         border.color: borderColor
                         border.width: 1
@@ -768,7 +883,7 @@ ApplicationWindow {
                                         placeholderTextColor: subTextColor
                                         maximumLength: 4
                                         background: Rectangle {
-                                            color: "#3a3a4e"
+                                            color: inputBgColor
                                             radius: 3
                                             border.color: borderColor
                                             border.width: 1
@@ -826,7 +941,7 @@ ApplicationWindow {
                                         placeholderTextColor: subTextColor
                                         maximumLength: 4
                                         background: Rectangle {
-                                            color: "#3a3a4e"
+                                            color: inputBgColor
                                             radius: 3
                                             border.color: borderColor
                                             border.width: 1
@@ -996,7 +1111,7 @@ ApplicationWindow {
                             placeholderText: "#RRGGBB"
                             placeholderTextColor: subTextColor
                             background: Rectangle {
-                                color: "#3a3a4e"
+                                color: inputBgColor
                                 radius: 3
                                 border.color: borderColor
                                 border.width: 1
@@ -1098,7 +1213,7 @@ ApplicationWindow {
                             placeholderText: "#RRGGBB"
                             placeholderTextColor: subTextColor
                             background: Rectangle {
-                                color: "#3a3a4e"
+                                color: inputBgColor
                                 radius: 3
                                 border.color: borderColor
                                 border.width: 1
@@ -1241,7 +1356,7 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    color: "#1a1a2e"
+                    color: monitorBgColor
                     radius: 4
                     border.color: borderColor
                     border.width: 1
@@ -1344,7 +1459,7 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 100
-                    color: "#1a1a2e"
+                    color: monitorBgColor
                     radius: 4
                     border.color: borderColor
                     border.width: 1
@@ -1422,7 +1537,7 @@ ApplicationWindow {
                                 placeholderText: sendHexMode ? "输入十六进制数据，如: 01 02 FF" : "输入要发送的文本..."
                                 placeholderTextColor: subTextColor
                                 background: Rectangle {
-                                    color: "#2a2a3e"
+                                    color: inputBgColor
                                     radius: 4
                                     border.color: borderColor
                                     border.width: 1

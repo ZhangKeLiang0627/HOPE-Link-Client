@@ -11,13 +11,38 @@ Window {
     modality: Qt.ApplicationModal
     flags: Qt.Dialog | Qt.WindowCloseButtonHint | Qt.WindowTitleHint
 
-    // Color scheme (consistent with main.qml)
-    readonly property color bgColor: "#1e1e2e"
-    readonly property color surfaceColor: "#2a2a3e"
-    readonly property color accentColor: "#89b4fa"
-    readonly property color textColor: "#cdd6f4"
-    readonly property color subTextColor: "#a6adc8"
-    readonly property color borderColor: "#45475a"
+    // ========== Theme System ==========
+    // Dark theme colors (consistent with main.qml)
+    readonly property color darkBgColor: "#1e1e2e"
+    readonly property color darkSurfaceColor: "#2a2a3e"
+    readonly property color darkAccentColor: "#89b4fa"
+    readonly property color darkTextColor: "#cdd6f4"
+    readonly property color darkSubTextColor: "#a6adc8"
+    readonly property color darkBorderColor: "#45475a"
+
+    // Light theme colors
+    readonly property color lightBgColor: "#f5f5f5"
+    readonly property color lightSurfaceColor: "#ffffff"
+    readonly property color lightAccentColor: "#4a6cf7"
+    readonly property color lightTextColor: "#1a1a2e"
+    readonly property color lightSubTextColor: "#6b7280"
+    readonly property color lightBorderColor: "#d1d5db"
+
+    // Current theme colors (reactive to themeManager.isDark)
+    property color bgColor: themeManager && themeManager.isDark ? darkBgColor : lightBgColor
+    property color surfaceColor: themeManager && themeManager.isDark ? darkSurfaceColor : lightSurfaceColor
+    property color accentColor: themeManager && themeManager.isDark ? darkAccentColor : lightAccentColor
+    property color textColor: themeManager && themeManager.isDark ? darkTextColor : lightTextColor
+    property color subTextColor: themeManager && themeManager.isDark ? darkSubTextColor : lightSubTextColor
+    property color borderColor: themeManager && themeManager.isDark ? darkBorderColor : lightBorderColor
+
+    // Update colors when theme changes
+    Connections {
+        target: themeManager
+        function onThemeChanged() {
+            console.log("Settings dialog: theme changed to:", themeManager.isDark ? "dark" : "light")
+        }
+    }
 
     color: bgColor
 

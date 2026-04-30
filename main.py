@@ -8,6 +8,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from about import AboutDialog
 from settings import SettingsDialog
 from control import ControlDialog
+from theme_manager import ThemeManager
 
 
 # OLED 参数
@@ -333,6 +334,10 @@ def main():
     bridge = SerialBridge()
     engine.rootContext().setContextProperty("serialBridge", bridge)
 
+    # Register theme manager (shared across all windows)
+    theme_manager = ThemeManager()
+    engine.rootContext().setContextProperty("themeManager", theme_manager)
+
     # Register dialog objects
     about_dialog = AboutDialog(engine)
     engine.rootContext().setContextProperty("aboutDialog", about_dialog)
@@ -345,6 +350,7 @@ def main():
 
     # Store references on the engine to prevent garbage collection
     engine._bridge = bridge
+    engine._theme_manager = theme_manager
     engine._about_dialog = about_dialog
     engine._settings_dialog = settings_dialog
     engine._control_dialog = control_dialog
