@@ -51,3 +51,11 @@ pyinstaller --onefile --name="HOPE-Link-Client" --icon=icon.ico --add-data "main
 # 不带窗体调试
 pyinstaller --onefile --windowed --name="HOPE-Link-Client" --icon=icon.ico --add-data "main.qml;." --add-data "image-0.png;." --collect-all PySide6 main.py
 ```
+
+## 关于MacOS串口传输拆包问题
+
+相同的下位机，在实测环境波特率为`921600`，串口转ttl为`CH340`下，Windows/Ubuntu能够正常图传；而MacOS会出现拆包现象，图片帧数据不完整，寻找包头或者包尾失败，导致图片传输失败。
+
+经过实测，设置波特率为`460800`，能够正常图传。
+
+> btw，不知道是WCH驱动对Mac的支持差，还是Mac本身的串口机制就有问题，总之很sad！
