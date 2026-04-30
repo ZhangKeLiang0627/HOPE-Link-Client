@@ -171,7 +171,7 @@ ApplicationWindow {
                     color: textColor
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
-                    rightPadding: 44  // 让出指示器区域（40px + 4px 间距）
+                    rightPadding: 34  // 让出指示器区域（40px + 4px 间距）
                     // 当用户输入完成时，接受自定义值
                     onAccepted: {
                         baudCombo.currentIndex = -1  // 标记为自定义值
