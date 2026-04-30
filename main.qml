@@ -539,13 +539,12 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: statusBar.top
-        anchors.margins: fullScreenMode ? 0 : 8
         color: bgColor
 
         // ====== Tab 0: OLED Display ======
         RowLayout {
             anchors.fill: parent
-            anchors.margins: fullScreenMode ? 0 : 8
+            anchors.margins: fullScreenMode ? 0 : 4
             spacing: fullScreenMode ? 0 : 8
             visible: currentTab === 0
 
@@ -560,8 +559,8 @@ ApplicationWindow {
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: fullScreenMode ? 0 : 8
-                    spacing: fullScreenMode ? 0 : 8
+                    anchors.margins: fullScreenMode ? 0 : 4
+                    spacing: fullScreenMode ? 0 : 4
 
                     // Header (全屏时隐藏)
                     RowLayout {
@@ -588,7 +587,7 @@ ApplicationWindow {
                         id: oledScreen
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.margins: fullScreenMode ? 0 : 8
+                        Layout.margins: fullScreenMode ? 0 : 4
                         color: bgColorCustom
                         radius: fullScreenMode ? 0 : 8
                         border.color: fullScreenMode ? "transparent" : borderColor
@@ -1243,7 +1242,7 @@ ApplicationWindow {
         // ====== Tab 1: 串口监视器 ======
         Rectangle {
             anchors.fill: parent
-            anchors.margins: 8
+            anchors.margins: 4
             visible: currentTab === 1
             color: surfaceColor
             radius: 6
@@ -1252,8 +1251,8 @@ ApplicationWindow {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 8
-                spacing: 8
+                anchors.margins: 4
+                spacing: 4
 
                 // 监视器头部
                 RowLayout {
