@@ -46,10 +46,12 @@ sudo usermod -aG dialout hugokkl
 ```shell
 pip install pyinstaller
 
-pyinstaller --onefile --name="HOPE-Link-Client" --icon=icon.ico --add-data "main.qml;." --add-data "image-0.png;." --collect-all PySide6 main.py
+pyinstaller --onefile --name="HOPE-Link-Client" --icon=icon.ico  --collect-all PySide6 main.py
 
 # 不带窗体调试
-pyinstaller --onefile --windowed --name="HOPE-Link-Client" --icon=icon.ico --add-data "main.qml;." --add-data "image-0.png;." --collect-all PySide6 main.py
+pyinstaller --onefile --windowed --name="HOPE-Link-Client" --icon=icon.ico  --collect-all PySide6 main.py
+
+# 生成exe后，将其放到project根目录下，即可双击启动！
 ```
 
 ## 关于MacOS串口传输拆包问题
