@@ -1669,23 +1669,43 @@ ApplicationWindow {
     // 文本接收缓冲区的起始时间戳
     property string textBufferTimestamp: ""
 
-    // 添加日志条目
-    function addMonitorEntry(type, content) {
+    // 监视器数据节流定时器（每100ms批量处理一次接收到的数据）
+    property var monitorThrottleTimer: null
+    // 节流缓冲区：累积待处理的原始数据
+    property string pendingHexData: ""
+    property string pendingTextData: ""
+
+    // 添加日志条目（轻量版，仅追加到数组，不触发重绘）
+    function addMonitorEntryLight(type, content) {
         var ts = new Date().toLocaleTimeString()
         var entry = {
-            "type": type,       // "rx_text", "rx_hex", "tx_text", "tx_hex"
+            "type": type,
             "timestamp": ts,
             "content": content
         }
-        // 使用展开运算符创建新数组，确保 ListView 能检测到变化
-        monitorEntries = monitorEntries.concat([entry])
+        monitorEntries.push(entry)
         // 限制条目数
-        if (monitorEntries.length > maxMonitorLines) {
+        if (monitorEntries.length > maxMonitorLines * 2) {
             monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
         }
-        // 更新纯文本 fallback
         monitorLog = monitorLog + "\n[" + ts + "] " + content
         trimMonitorLog()
+    }
+
+    // 批量刷新监视器显示（由节流定时器触发）
+    function flushMonitorDisplay() {
+        if (monitorEntries.length > 0) {
+            // 触发 ListView 刷新（重新赋值数组引用）
+            monitorEntries = monitorEntries.concat([])
+            scrollToBottom()
+            monitorBlink = !monitorBlink
+        }
+    }
+
+    // 添加日志条目（完整版，立即刷新显示）
+    function addMonitorEntry(type, content) {
+        addMonitorEntryLight(type, content)
+        monitorEntries = monitorEntries.concat([])
         scrollToBottom()
         monitorBlink = !monitorBlink
     }
@@ -1729,7 +1749,7 @@ ApplicationWindow {
         }
     }
 
-    // 接收 HEX 数据
+    // 接收 HEX 数据（使用轻量版追加，由节流定时器统一刷新）
     Connections {
         target: serialBridge
         function onRawDataReceived(hexStr) {
@@ -1749,7 +1769,7 @@ ApplicationWindow {
                         formatted += "\n" + " ".repeat(12) + spaced.trim()
                     }
                 }
-                addMonitorEntry("rx_hex", formatted)
+                addMonitorEntryLight("rx_hex", formatted)
             }
         }
     }
@@ -1788,11 +1808,11 @@ ApplicationWindow {
                     var line = textBuffer.substring(0, newlineIdx)
                     var ts = textBufferTimestamp !== "" ? textBufferTimestamp : new Date().toLocaleTimeString()
 
-                    // 如果有未完成的"进行中"条目，先移除它（因为它即将被正式的完整行替代）
+                    // 如果有未完成的"进行中"条目，先移除它
                     if (monitorEntries.length > 0) {
                         var lastCheck = monitorEntries[monitorEntries.length - 1]
                         if (lastCheck.type === "rx_text_pending") {
-                            monitorEntries = monitorEntries.slice(0, monitorEntries.length - 1)
+                            monitorEntries.pop()
                         }
                     }
 
@@ -1802,8 +1822,8 @@ ApplicationWindow {
                             "timestamp": ts,
                             "content": line
                         }
-                        monitorEntries = monitorEntries.concat([entry])
-                        if (monitorEntries.length > maxMonitorLines) {
+                        monitorEntries.push(entry)
+                        if (monitorEntries.length > maxMonitorLines * 2) {
                             monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
                         }
                         monitorLog = monitorLog + "\n[" + ts + "] " + line
@@ -1815,33 +1835,27 @@ ApplicationWindow {
                     processed = true
                 }
 
-                // 如果没有处理出任何完整行（即缓冲区中没有换行符），
-                // 且缓冲区有内容，则显示一个临时的"进行中"条目
+                // 如果没有处理出任何完整行，且缓冲区有内容，则显示一个临时的"进行中"条目
                 if (!processed && textBuffer.length > 0) {
-                    // 检查最后一条条目是否是一个未完成的"进行中"条目
                     var lastEntry = monitorEntries.length > 0 ? monitorEntries[monitorEntries.length - 1] : null
                     if (lastEntry && lastEntry.type === "rx_text_pending") {
                         // 更新已有的"进行中"条目
                         lastEntry.content = textBuffer
                         monitorEntries[monitorEntries.length - 1] = lastEntry
-                        monitorEntries = monitorEntries.concat([])
                     } else {
-                        // 创建一个新的"进行中"条目（使用不同的类型，以便与完整行区分）
                         var pendingEntry = {
                             "type": "rx_text_pending",
                             "timestamp": textBufferTimestamp !== "" ? textBufferTimestamp : new Date().toLocaleTimeString(),
                             "content": textBuffer
                         }
-                        monitorEntries = monitorEntries.concat([pendingEntry])
-                        if (monitorEntries.length > maxMonitorLines) {
+                        monitorEntries.push(pendingEntry)
+                        if (monitorEntries.length > maxMonitorLines * 2) {
                             monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
                         }
                     }
                 }
 
                 trimMonitorLog()
-                scrollToBottom()
-                monitorBlink = !monitorBlink
             }
         }
     }
@@ -1878,12 +1892,19 @@ ApplicationWindow {
     // Auto refresh ports on startup
     Component.onCompleted: {
         serialBridge.refresh_ports()
-        // 创建定时清理定时器
+        // 创建定时清理定时器（每30秒清理一次）
         monitorCleanupTimer = Qt.createQmlObject(
             'import QtQuick 2.0; Timer { interval: 30000; running: true; repeat: true; }',
             root
         )
         monitorCleanupTimer.triggered.connect(cleanupMonitorEntries)
+
+        // 创建监视器节流定时器（每100ms批量刷新一次显示）
+        monitorThrottleTimer = Qt.createQmlObject(
+            'import QtQuick 2.0; Timer { interval: 100; running: true; repeat: true; }',
+            root
+        )
+        monitorThrottleTimer.triggered.connect(flushMonitorDisplay)
     }
 
     // ========== Custom Button Component ==========
