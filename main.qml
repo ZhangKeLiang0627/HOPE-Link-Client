@@ -86,7 +86,14 @@ ApplicationWindow {
     // 当前标签页索引 (0 = OLED显示, 1 = 串口监视器)
     property int currentTab: 0
 
+    // 监视器定时清理定时器（每30秒清理一次）
+    property var monitorCleanupTimer: null
+
+    // 监视器最大条目数（超过此数自动清理一半）
+    readonly property int maxMonitorLines: 500
+
     // ========== Top Toolbar ==========
+
     Rectangle {
         id: toolbar
         anchors.top: parent.top
@@ -1653,9 +1660,6 @@ ApplicationWindow {
     // 监视器日志条目列表 (每个条目包含 type, timestamp, content)
     property var monitorEntries: []
 
-    // 最大日志行数
-    readonly property int maxMonitorLines: 1000
-
     // 命令历史
     property var commandHistory: []
     property int commandHistoryIndex: -1
@@ -1851,9 +1855,35 @@ ApplicationWindow {
         }
     }
 
+    // 当前标签页变化时，同步通知 Python 后端
+    onCurrentTabChanged: {
+        if (serialBridge) {
+            serialBridge.monitorTabActive = (currentTab === 1)
+        }
+    }
+
+    // 监视器条目定时清理（每30秒清理一次，防止无限增长）
+    function cleanupMonitorEntries() {
+        if (monitorEntries.length > maxMonitorLines) {
+            // 保留最新的 maxMonitorLines 条
+            monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
+            // 同时清理 monitorLog
+            var lines = monitorLog.split("\n")
+            if (lines.length > maxMonitorLines) {
+                monitorLog = lines.slice(lines.length - maxMonitorLines).join("\n")
+            }
+        }
+    }
+
     // Auto refresh ports on startup
     Component.onCompleted: {
         serialBridge.refresh_ports()
+        // 创建定时清理定时器
+        monitorCleanupTimer = Qt.createQmlObject(
+            'import QtQuick 2.0; Timer { interval: 30000; running: true; repeat: true; }',
+            root
+        )
+        monitorCleanupTimer.triggered.connect(cleanupMonitorEntries)
     }
 
     // ========== Custom Button Component ==========

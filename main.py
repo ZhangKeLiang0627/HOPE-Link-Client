@@ -37,6 +37,7 @@ class SerialBridge(QObject):
     rawDataReceived = Signal(str)  # 串口监视器收到的原始数据（十六进制）
     rawTextReceived = Signal(str)  # 串口监视器收到的文本数据
     monitorCleared = Signal()      # 监视器清空信号
+    monitorTabActiveChanged = Signal()  # 监视器标签页激活状态变化
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -63,6 +64,15 @@ class SerialBridge(QObject):
         self._pkg_header = PKG_HEADER  # bytes, 长度2
         self._pkg_footer = PKG_FOOTER  # bytes, 长度2
 
+        # 监视器标签页是否激活（只有激活时才发送监视器数据到QML）
+        self._monitor_tab_active = False
+
+        # 帧计数节流：避免频繁调用 _set_status 导致信号风暴
+        self._frame_count_since_last_status = 0
+        self._last_status_time = 0
+        import time
+        self._time_module = time
+
     # ---------- Properties exposed to QML ----------
 
     @Property(list, notify=portsChanged)
@@ -81,7 +91,19 @@ class SerialBridge(QObject):
     def statusMessage(self):
         return self._status_message
 
+    @Property(bool, notify=monitorTabActiveChanged)
+    def monitorTabActive(self):
+        """监视器标签页是否激活（只有激活时才发送监视器数据到QML）"""
+        return self._monitor_tab_active
+
+    @monitorTabActive.setter
+    def monitorTabActive(self, active):
+        if self._monitor_tab_active != active:
+            self._monitor_tab_active = active
+            self.monitorTabActiveChanged.emit()
+
     # ---------- 可自定义的包头包尾属性 ----------
+
 
     @Property(str, notify=pkgHeaderChanged)
     def pkgHeader(self):
@@ -305,22 +327,37 @@ class SerialBridge(QObject):
         try:
             if self._serial_port.in_waiting > 0:
                 data = self._serial_port.read(self._serial_port.in_waiting)
-                # 直接解析 OLED 协议包
+                # 直接解析 OLED 协议包（始终解析，不管哪个标签页）
                 self._parse_oled_packet(data)
-                # 同时发送原始数据到串口监视器
-                hex_str = data.hex().upper()
-                self.rawDataReceived.emit(hex_str)
-                # 尝试以文本形式发送（过滤不可见字符）
-                try:
-                    text = data.decode("utf-8", errors="replace")
-                    self.rawTextReceived.emit(text)
-                except Exception:
-                    pass
+                # 只有监视器标签页激活时才发送监视器数据到QML
+                if self._monitor_tab_active:
+                    hex_str = data.hex().upper()
+                    self.rawDataReceived.emit(hex_str)
+                    try:
+                        text = data.decode("utf-8", errors="replace")
+                        self.rawTextReceived.emit(text)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
     def _set_status(self, msg):
-        self._status_message = msg
+        """更新状态栏消息，带节流控制避免信号风暴。"""
+        # OLED帧更新消息使用节流：最多每500ms更新一次
+        if msg.startswith("OLED 帧已更新"):
+            self._frame_count_since_last_status += 1
+            now = self._time_module.time()
+            if now - self._last_status_time < 0.5:
+                # 节流：不发送信号，只更新内部计数
+                return
+            # 发送带帧率的汇总消息
+            elapsed = now - self._last_status_time
+            fps = self._frame_count_since_last_status / elapsed if elapsed > 0 else 0
+            self._status_message = f"OLED 帧已更新 ({fps:.0f} fps)"
+            self._frame_count_since_last_status = 0
+            self._last_status_time = now
+        else:
+            self._status_message = msg
         self.statusMessageChanged.emit()
 
 
