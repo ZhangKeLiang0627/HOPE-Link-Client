@@ -1664,14 +1664,14 @@ ApplicationWindow {
     property var commandHistory: []
     property int commandHistoryIndex: -1
 
-    // 文本接收缓冲区 - 用于累积未遇到换行符的文本
+    // 文本接收缓冲区 - 用于累积未遇到换行符的原始文本数据
     property string textBuffer: ""
     // 文本接收缓冲区的起始时间戳
     property string textBufferTimestamp: ""
 
-    // 监视器数据节流定时器（每100ms批量处理一次接收到的数据）
+    // 监视器数据节流定时器（每200ms批量处理一次接收到的数据）
     property var monitorThrottleTimer: null
-    // 节流缓冲区：累积待处理的原始数据
+    // 节流缓冲区：累积待处理的原始数据（信号处理器只做缓冲，不做处理）
     property string pendingHexData: ""
     property string pendingTextData: ""
 
@@ -1684,7 +1684,7 @@ ApplicationWindow {
             "content": content
         }
         monitorEntries.push(entry)
-        // 限制条目数
+        // 限制条目数 - 超过上限时丢弃一半旧数据
         if (monitorEntries.length > maxMonitorLines * 2) {
             monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
         }
@@ -1692,17 +1692,113 @@ ApplicationWindow {
         trimMonitorLog()
     }
 
-    // 批量刷新监视器显示（由节流定时器触发）
+    // 批量处理缓冲数据并刷新显示（由节流定时器触发）
     function flushMonitorDisplay() {
+        // 1. 处理 HEX 缓冲数据
+        if (pendingHexData.length > 0 && monitorHexMode) {
+            var hexStr = pendingHexData
+            pendingHexData = ""
+            // 格式化 HEX 显示，每行显示 16 字节
+            var formatted = ""
+            for (var i = 0; i < hexStr.length; i += 32) {
+                var chunk = hexStr.substring(i, Math.min(i + 32, hexStr.length))
+                var spaced = ""
+                for (var j = 0; j < chunk.length; j += 2) {
+                    spaced += chunk.substring(j, j + 2) + " "
+                }
+                if (i === 0) {
+                    formatted = spaced.trim()
+                } else {
+                    formatted += "\n" + " ".repeat(12) + spaced.trim()
+                }
+            }
+            addMonitorEntryLight("rx_hex", formatted)
+        }
+
+        // 2. 处理文本缓冲数据
+        if (pendingTextData.length > 0 && !monitorHexMode) {
+            var rawText = pendingTextData
+            pendingTextData = ""
+            // 替换不可见字符为可显示形式（保留换行符）
+            var display = rawText.replace(/[^\x20-\x7E\n\r\t]/g, function(c) {
+                return "\\x" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")
+            })
+            // 追加到缓冲区
+            textBuffer += display
+            // 限制 textBuffer 大小，防止无限增长
+            if (textBuffer.length > 10000) {
+                textBuffer = textBuffer.substring(textBuffer.length - 5000)
+            }
+            // 处理缓冲区中的所有完整行
+            var processed = false
+            var maxLinesPerBatch = 50  // 每批最多处理50行，防止卡死
+            var linesProcessed = 0
+            while (linesProcessed < maxLinesPerBatch) {
+                var newlineIdx = textBuffer.indexOf("\n")
+                if (newlineIdx < 0) {
+                    newlineIdx = textBuffer.indexOf("\r")
+                }
+                if (newlineIdx < 0) break
+
+                var line = textBuffer.substring(0, newlineIdx)
+                var ts = textBufferTimestamp !== "" ? textBufferTimestamp : new Date().toLocaleTimeString()
+
+                // 移除旧的"进行中"条目
+                if (monitorEntries.length > 0) {
+                    var lastCheck = monitorEntries[monitorEntries.length - 1]
+                    if (lastCheck.type === "rx_text_pending") {
+                        monitorEntries.pop()
+                    }
+                }
+
+                if (line.length > 0) {
+                    monitorEntries.push({
+                        "type": "rx_text",
+                        "timestamp": ts,
+                        "content": line
+                    })
+                    if (monitorEntries.length > maxMonitorLines * 2) {
+                        monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
+                    }
+                    monitorLog = monitorLog + "\n[" + ts + "] " + line
+                }
+
+                textBuffer = textBuffer.substring(newlineIdx + 1)
+                textBufferTimestamp = new Date().toLocaleTimeString()
+                processed = true
+                linesProcessed++
+            }
+
+            // 如果没有处理出完整行，且缓冲区有内容，显示"进行中"条目
+            if (!processed && textBuffer.length > 0) {
+                var lastEntry = monitorEntries.length > 0 ? monitorEntries[monitorEntries.length - 1] : null
+                if (lastEntry && lastEntry.type === "rx_text_pending") {
+                    lastEntry.content = textBuffer
+                    monitorEntries[monitorEntries.length - 1] = lastEntry
+                } else {
+                    monitorEntries.push({
+                        "type": "rx_text_pending",
+                        "timestamp": textBufferTimestamp !== "" ? textBufferTimestamp : new Date().toLocaleTimeString(),
+                        "content": textBuffer
+                    })
+                    if (monitorEntries.length > maxMonitorLines * 2) {
+                        monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
+                    }
+                }
+            }
+
+            trimMonitorLog()
+        }
+
+        // 3. 刷新 ListView 显示
         if (monitorEntries.length > 0) {
-            // 触发 ListView 刷新（重新赋值数组引用）
             monitorEntries = monitorEntries.concat([])
             scrollToBottom()
             monitorBlink = !monitorBlink
         }
     }
 
-    // 添加日志条目（完整版，立即刷新显示）
+    // 添加日志条目（完整版，立即刷新显示，用于发送数据等需要即时反馈的场景）
     function addMonitorEntry(type, content) {
         addMonitorEntryLight(type, content)
         monitorEntries = monitorEntries.concat([])
@@ -1718,7 +1814,7 @@ ApplicationWindow {
 
         // 保存到命令历史
         commandHistory.push(text)
-        commandHistoryIndex = commandHistory.length  // 指向末尾之后（新输入位置）
+        commandHistoryIndex = commandHistory.length
 
         if (sendHexMode) {
             serialBridge.send_hex_data(text)
@@ -1749,113 +1845,30 @@ ApplicationWindow {
         }
     }
 
-    // 接收 HEX 数据（使用轻量版追加，由节流定时器统一刷新）
+    // 接收 HEX 数据 - 只缓冲原始数据，由节流定时器处理
     Connections {
         target: serialBridge
         function onRawDataReceived(hexStr) {
             if (monitorHexMode) {
-                // 格式化 HEX 显示，每行显示 16 字节
-                var formatted = ""
-                for (var i = 0; i < hexStr.length; i += 32) {
-                    var chunk = hexStr.substring(i, Math.min(i + 32, hexStr.length))
-                    // 插入空格每2个字符
-                    var spaced = ""
-                    for (var j = 0; j < chunk.length; j += 2) {
-                        spaced += chunk.substring(j, j + 2) + " "
-                    }
-                    if (i === 0) {
-                        formatted = spaced.trim()
-                    } else {
-                        formatted += "\n" + " ".repeat(12) + spaced.trim()
-                    }
+                pendingHexData += hexStr
+                // 限制缓冲大小
+                if (pendingHexData.length > 100000) {
+                    pendingHexData = pendingHexData.substring(pendingHexData.length - 50000)
                 }
-                addMonitorEntryLight("rx_hex", formatted)
             }
         }
     }
 
-    // 接收文本数据 - 使用缓冲区累积文本，遇到换行符才添加时间戳
+    // 接收文本数据 - 只缓冲原始数据，由节流定时器处理
     Connections {
         target: serialBridge
         function onRawTextReceived(text) {
             if (!monitorHexMode) {
-                // 替换不可见字符为可显示形式（保留换行符）
-                var display = text.replace(/[^\x20-\x7E\n\r\t]/g, function(c) {
-                    return "\\x" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")
-                })
-
-                // 追加到缓冲区
-                textBuffer += display
-
-                // 循环处理缓冲区中的所有完整行（以换行符分隔）
-                var processed = false
-                while (true) {
-                    // 查找缓冲区中第一个换行符的位置
-                    var newlineIdx = -1
-                    for (var k = 0; k < textBuffer.length; k++) {
-                        if (textBuffer.charAt(k) === "\n" || textBuffer.charAt(k) === "\r") {
-                            newlineIdx = k
-                            break
-                        }
-                    }
-
-                    if (newlineIdx < 0) {
-                        // 没有换行符，停止处理
-                        break
-                    }
-
-                    // 提取换行符之前的内容作为一行
-                    var line = textBuffer.substring(0, newlineIdx)
-                    var ts = textBufferTimestamp !== "" ? textBufferTimestamp : new Date().toLocaleTimeString()
-
-                    // 如果有未完成的"进行中"条目，先移除它
-                    if (monitorEntries.length > 0) {
-                        var lastCheck = monitorEntries[monitorEntries.length - 1]
-                        if (lastCheck.type === "rx_text_pending") {
-                            monitorEntries.pop()
-                        }
-                    }
-
-                    if (line.length > 0) {
-                        var entry = {
-                            "type": "rx_text",
-                            "timestamp": ts,
-                            "content": line
-                        }
-                        monitorEntries.push(entry)
-                        if (monitorEntries.length > maxMonitorLines * 2) {
-                            monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
-                        }
-                        monitorLog = monitorLog + "\n[" + ts + "] " + line
-                    }
-
-                    // 剩余部分（换行符之后的内容）继续留在缓冲区
-                    textBuffer = textBuffer.substring(newlineIdx + 1)
-                    textBufferTimestamp = new Date().toLocaleTimeString()
-                    processed = true
+                pendingTextData += text
+                // 限制缓冲大小
+                if (pendingTextData.length > 100000) {
+                    pendingTextData = pendingTextData.substring(pendingTextData.length - 50000)
                 }
-
-                // 如果没有处理出任何完整行，且缓冲区有内容，则显示一个临时的"进行中"条目
-                if (!processed && textBuffer.length > 0) {
-                    var lastEntry = monitorEntries.length > 0 ? monitorEntries[monitorEntries.length - 1] : null
-                    if (lastEntry && lastEntry.type === "rx_text_pending") {
-                        // 更新已有的"进行中"条目
-                        lastEntry.content = textBuffer
-                        monitorEntries[monitorEntries.length - 1] = lastEntry
-                    } else {
-                        var pendingEntry = {
-                            "type": "rx_text_pending",
-                            "timestamp": textBufferTimestamp !== "" ? textBufferTimestamp : new Date().toLocaleTimeString(),
-                            "content": textBuffer
-                        }
-                        monitorEntries.push(pendingEntry)
-                        if (monitorEntries.length > maxMonitorLines * 2) {
-                            monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
-                        }
-                    }
-                }
-
-                trimMonitorLog()
             }
         }
     }
@@ -1866,6 +1879,10 @@ ApplicationWindow {
         function onMonitorCleared() {
             monitorLog = ""
             monitorEntries = []
+            textBuffer = ""
+            textBufferTimestamp = ""
+            pendingHexData = ""
+            pendingTextData = ""
         }
     }
 
@@ -1879,9 +1896,7 @@ ApplicationWindow {
     // 监视器条目定时清理（每30秒清理一次，防止无限增长）
     function cleanupMonitorEntries() {
         if (monitorEntries.length > maxMonitorLines) {
-            // 保留最新的 maxMonitorLines 条
             monitorEntries = monitorEntries.slice(monitorEntries.length - maxMonitorLines)
-            // 同时清理 monitorLog
             var lines = monitorLog.split("\n")
             if (lines.length > maxMonitorLines) {
                 monitorLog = lines.slice(lines.length - maxMonitorLines).join("\n")
@@ -1899,9 +1914,9 @@ ApplicationWindow {
         )
         monitorCleanupTimer.triggered.connect(cleanupMonitorEntries)
 
-        // 创建监视器节流定时器（每100ms批量刷新一次显示）
+        // 创建监视器节流定时器（每200ms批量处理并刷新一次显示）
         monitorThrottleTimer = Qt.createQmlObject(
-            'import QtQuick 2.0; Timer { interval: 100; running: true; repeat: true; }',
+            'import QtQuick 2.0; Timer { interval: 200; running: true; repeat: true; }',
             root
         )
         monitorThrottleTimer.triggered.connect(flushMonitorDisplay)
