@@ -25,17 +25,17 @@ ApplicationWindow {
     readonly property color darkInputBgColor: "#3a3a4e"
     readonly property color darkMonitorBgColor: "#1a1a2e"
 
-    // Light theme colors (米白色系)
-    readonly property color lightBgColor: "#f5f0eb"
-    readonly property color lightSurfaceColor: "#faf7f2"
-    readonly property color lightAccentColor: "#4f6ef7"
-    readonly property color lightTextColor: "#2c2c2c"
-    readonly property color lightSubTextColor: "#78716c"
-    readonly property color lightErrorColor: "#dc2626"
-    readonly property color lightSuccessColor: "#16a34a"
-    readonly property color lightBorderColor: "#d6d0c8"
+    // Light theme colors (莫兰迪色系)
+    readonly property color lightBgColor: "#f0ebe3"
+    readonly property color lightSurfaceColor: "#f5f0e8"
+    readonly property color lightAccentColor: "#7a8fa6"
+    readonly property color lightTextColor: "#3c3a36"
+    readonly property color lightSubTextColor: "#8a8580"
+    readonly property color lightErrorColor: "#c47a7a"
+    readonly property color lightSuccessColor: "#7a9e7a"
+    readonly property color lightBorderColor: "#d4cdc4"
     readonly property color lightInputBgColor: "#e8e2da"
-    readonly property color lightMonitorBgColor: "#fdfbf8"
+    readonly property color lightMonitorBgColor: "#faf6f0"
 
     // Current theme colors (reactive to themeManager.isDark)
     property color bgColor: themeManager && themeManager.isDark ? darkBgColor : lightBgColor
@@ -1517,7 +1517,7 @@ ApplicationWindow {
 
                             Item { Layout.fillWidth: true }
 
-                            // 发送新行
+                            // 追加换行下拉框
                             Text {
                                 text: "追加换行:"
                                 color: subTextColor
@@ -1525,14 +1525,91 @@ ApplicationWindow {
                                 verticalAlignment: Text.AlignVCenter
                             }
 
-                            CustomButton {
-                                id: appendNewlineBtn
+                            ComboBox {
+                                id: appendNewlineCombo
                                 Layout.preferredHeight: 22
-                                Layout.preferredWidth: 50
-                                text: monitorAppendNewline ? "开" : "关"
+                                Layout.preferredWidth: 80
+                                model: appendNewlineOptions
+                                currentIndex: appendNewlineIndex
                                 font.pixelSize: 10
-                                btnColor: monitorAppendNewline ? successColor : errorColor
-                                onClicked: monitorAppendNewline = !monitorAppendNewline
+                                background: Rectangle {
+                                    color: inputBgColor
+                                    radius: 4
+                                    border.color: borderColor
+                                    border.width: 1
+                                }
+                                contentItem: Text {
+                                    text: appendNewlineCombo.currentText
+                                    color: textColor
+                                    verticalAlignment: Text.AlignVCenter
+                                    horizontalAlignment: Text.AlignHCenter
+                                    font.pixelSize: 10
+                                }
+                                indicator: Rectangle {
+                                    x: parent.width - width
+                                    width: 20
+                                    height: parent.height
+                                    color: "transparent"
+                                    Canvas {
+                                        anchors.centerIn: parent
+                                        width: 8
+                                        height: 5
+                                        onPaint: {
+                                            var ctx = getContext("2d")
+                                            ctx.fillStyle = subTextColor
+                                            ctx.beginPath()
+                                            ctx.moveTo(0, 0)
+                                            ctx.lineTo(width, 0)
+                                            ctx.lineTo(width / 2, height)
+                                            ctx.closePath()
+                                            ctx.fill()
+                                        }
+                                    }
+                                }
+                                popup: Popup {
+                                    y: parent.height
+                                    width: parent.width
+                                    implicitHeight: contentItem.implicitHeight
+                                    padding: 1
+                                    background: Rectangle {
+                                        color: surfaceColor
+                                        border.color: borderColor
+                                        radius: 4
+                                    }
+                                    contentItem: ListView {
+                                        clip: true
+                                        implicitHeight: contentHeight
+                                        model: appendNewlineCombo.model
+                                        delegate: ItemDelegate {
+                                            width: parent.width
+                                            height: 26
+                                            contentItem: Text {
+                                                text: modelData
+                                                color: textColor
+                                                verticalAlignment: Text.AlignVCenter
+                                                horizontalAlignment: Text.AlignHCenter
+                                                font.pixelSize: 10
+                                            }
+                                            background: Rectangle {
+                                                color: hovered ? "#3a3a4e" : "transparent"
+                                            }
+                                            onClicked: {
+                                                appendNewlineCombo.currentIndex = index
+                                                appendNewlineCombo.popup.close()
+                                                // 更新追加换行类型
+                                                var selected = appendNewlineOptions[index]
+                                                if (selected === "无") {
+                                                    monitorAppendNewline = ""
+                                                } else if (selected === "\\n") {
+                                                    monitorAppendNewline = "\n"
+                                                } else if (selected === "\\r\\n") {
+                                                    monitorAppendNewline = "\r\n"
+                                                }
+                                                appendNewlineIndex = index
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -1650,8 +1727,12 @@ ApplicationWindow {
     property bool monitorAutoScroll: true
     // 发送模式 (true=HEX, false=ASCII)
     property bool sendHexMode: false
-    // 追加换行
-    property bool monitorAppendNewline: true
+    // 追加换行选项: "无", "\n", "\r\n"
+    property string monitorAppendNewline: "\n"
+    // 追加换行下拉框选项列表
+    property var appendNewlineOptions: ["无", "\\n", "\\r\\n"]
+    // 追加换行下拉框当前索引
+    property int appendNewlineIndex: 1
     // 监视器日志文本 (plain text fallback)
     property string monitorLog: ""
     // 闪烁指示器
@@ -1820,8 +1901,9 @@ ApplicationWindow {
             serialBridge.send_hex_data(text)
             addMonitorEntry("tx_hex", text.toUpperCase())
         } else {
-            if (monitorAppendNewline) {
-                serialBridge.send_data(text + "\n")
+            // 根据下拉框选择追加换行类型
+            if (monitorAppendNewline !== "") {
+                serialBridge.send_data(text + monitorAppendNewline)
             } else {
                 serialBridge.send_data(text)
             }
