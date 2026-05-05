@@ -11,8 +11,10 @@
 ![](docs/images/image-2.png)
 ![](docs/images/image.png)
 ![](docs/images/image-1.png)
-![](docs/images/video.gif)
-...
+
+## Showcase
+https://github.com/user-attachments/assets/124f6f75-b7b5-4ffa-9624-459147c83b32
+
 
 ## Install
 
