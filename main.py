@@ -5,11 +5,12 @@ from PySide6.QtCore import QObject, Signal, Slot, Property, QTimer, QByteArray
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 
-from about import AboutDialog
-from settings import SettingsDialog
-from control import ControlDialog
-from theme_manager import ThemeManager
+from src.about import AboutDialog
+from src.settings import SettingsDialog
+from src.control import ControlDialog
+from src.theme_manager import ThemeManager
 
+import resources_rc
 
 # OLED 参数
 OLED_WIDTH = 128
@@ -363,7 +364,7 @@ class SerialBridge(QObject):
 
 def main():
     app = QGuiApplication(sys.argv)
-    app.setWindowIcon(QIcon("image-0.png"))
+    app.setWindowIcon(QIcon("qrc:/assets/images/image-0.png"))
     engine = QQmlApplicationEngine()
 
     # Keep strong references to prevent garbage collection
@@ -392,7 +393,7 @@ def main():
     engine._settings_dialog = settings_dialog
     engine._control_dialog = control_dialog
 
-    engine.load("main.qml")
+    engine.load("qrc:/qml/main.qml")
 
     if not engine.rootObjects():
         sys.exit(-1)

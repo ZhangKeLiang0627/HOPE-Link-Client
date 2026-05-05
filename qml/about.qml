@@ -63,20 +63,11 @@ Window {
             // Author Avatar
             Image {
                 Layout.alignment: Qt.AlignHCenter
-                source: "avatar.png"
+                source: "qrc:/assets/images/avatar.png"
                 sourceSize.width: 100
                 sourceSize.height: 100
                 fillMode: Image.PreserveAspectCrop
             }
-
-
-
-
-
-
-
-
-
             // Author Name
             Text {
                 Layout.alignment: Qt.AlignHCenter
