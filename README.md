@@ -15,11 +15,17 @@ conda activate pyside6
 # 安装pyside6组件
 pip install pyside6
 
-# 安装pyserial
-pip install pyserial
+# 安装依赖
+pip install -r requirements.txt
 
 # Ubuntu安装X11相关依赖
 sudo apt install libxcb-cursor0 libxcb-xinerama0 libxcb-randr0 libxcb-render0 libxcb-shape0 libxcb-xfixes0 libxcb-xkb-dev libxkbcommon-x11-0
+
+# 编译resources.qrc
+python compile_resources.py
+
+# 运行项目
+python main.py
 ```
 
 - thanks：https://www.cnblogs.com/mthoutai/p/19613677
@@ -46,10 +52,10 @@ sudo usermod -aG dialout hugokkl
 ```shell
 pip install pyinstaller
 
-pyinstaller --onefile --name="HOPE-Link-Client" --icon=icon.ico  --collect-all PySide6 main.py
+pyinstaller --onefile --name="HOPE-Link-Client" --collect-all PySide6 main.py
 
 # 不带窗体调试
-pyinstaller --onefile --windowed --name="HOPE-Link-Client" --icon=icon.ico  --collect-all PySide6 main.py
+pyinstaller --onefile --windowed --name="HOPE-Link-Client" --collect-all PySide6 main.py
 
 # 生成exe后，将其放到project根目录下，即可双击启动！
 ```
