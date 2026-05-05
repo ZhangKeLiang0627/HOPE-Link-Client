@@ -55,7 +55,9 @@ ApplicationWindow {
         function onThemeChanged() {
             // Force property re-evaluation by toggling a dummy property
             // The property bindings above will automatically update
-            console.log("Theme changed to:", themeManager.isDark ? "dark" : "light")
+            var mode = themeManager.isDark ? "dark" : "light"
+            console.log("Theme changed to:", mode)
+            if (logger) logger.info("主题已切换为: " + mode)
         }
     }
 
@@ -304,7 +306,12 @@ ApplicationWindow {
                 Layout.preferredWidth: 36
                 text: "↻"
                 tooltip: "刷新串口列表"
-                onClicked: { if (serialBridge) serialBridge.refresh_ports() }
+                onClicked: {
+                    if (serialBridge) {
+                        if (logger) logger.info("用户点击了刷新串口按钮")
+                        serialBridge.refresh_ports()
+                    }
+                }
             }
 
             // Settings button
@@ -442,15 +449,18 @@ ApplicationWindow {
                 onClicked: {
                     if (!serialBridge) return
                     if (serialBridge.connected) {
+                        if (logger) logger.info("用户点击了断开连接按钮")
                         serialBridge.disconnect_port()
                     } else {
                         if (portCombo.currentIndex < 0) {
+                            if (logger) logger.warning("用户尝试连接但未选择串口")
                             return
                         }
                         var baudRate = baudCombo.editText.trim()
                         if (baudRate === "") {
                             baudRate = baudCombo.currentText
                         }
+                        if (logger) logger.info("用户尝试连接串口: " + portCombo.currentText + " @ " + baudRate)
                         serialBridge.connect_port(portCombo.currentText, baudRate)
                     }
                 }
@@ -1988,6 +1998,7 @@ ApplicationWindow {
 
     // Auto refresh ports on startup
     Component.onCompleted: {
+        if (logger) logger.info("HOPE-Link Client 启动完成")
         serialBridge.refresh_ports()
         // 创建定时清理定时器（每30秒清理一次）
         monitorCleanupTimer = Qt.createQmlObject(

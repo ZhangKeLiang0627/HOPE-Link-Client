@@ -14,7 +14,8 @@ if sys.stderr is not None:
     logger.add(sys.stderr, level=log_level)
 
 logger.add(
-    os.path.join(tempfile.gettempdir(), "screenvivid.log"),
+    # os.path.join(tempfile.gettempdir(), "hope-link-client.log"),
+    os.path.join(os.getcwd(), "hope-link-client.log"),
     rotation="5 MB",
     level=log_level
 )

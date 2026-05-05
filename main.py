@@ -9,6 +9,8 @@ from src.about import AboutDialog
 from src.settings import SettingsDialog
 from src.control import ControlDialog
 from src.theme_manager import ThemeManager
+from src.models import LoggerModel
+from src.utils.logging import logger
 
 import resources_rc
 
@@ -162,12 +164,14 @@ class SerialBridge(QObject):
         port_list = serial.tools.list_ports.comports()
         self._ports = [f"{p.device} - {p.description}" for p in port_list]
         self.portsChanged.emit()
+        logger.info(f"扫描到 {len(self._ports)} 个串口: {self._ports}")
         self._set_status(f"扫描到 {len(self._ports)} 个串口")
 
     @Slot(str, str)
     def connect_port(self, port_info, baud_rate):
         """Connect to the selected serial port."""
         if self._connected:
+            logger.warning("尝试连接时已处于连接状态")
             self._set_status("已连接，请先断开")
             return
 
@@ -186,18 +190,21 @@ class SerialBridge(QObject):
             self._connected = True
             self.connectedChanged.emit()
             self._timer.start(10)  # Poll every 10ms for faster response
+            logger.info(f"已连接到 {device} @ {baud_rate} bps")
             self._set_status(f"已连接到 {device} @ {baud_rate} bps")
             # 重置协议解析状态
             self._parse_state = 0
             self._oled_data = bytearray()
             self._oled_data_count = 0
         except PermissionError:
+            logger.error(f"连接 {device} 权限不足")
             self._set_status(
                 f"权限不足！请将用户加入 dialout 组:\n"
                 f"  sudo usermod -a -G dialout $USER\n"
                 f"然后注销重新登录"
             )
         except Exception as e:
+            logger.error(f"连接 {device} 失败: {str(e)}")
             self._set_status(f"连接失败: {str(e)}")
 
     @Slot()
@@ -208,8 +215,9 @@ class SerialBridge(QObject):
         if self._serial_port and self._serial_port.is_open:
             try:
                 self._serial_port.close()
-            except Exception:
-                pass
+                logger.info("串口已断开连接")
+            except Exception as e:
+                logger.error(f"断开串口时出错: {str(e)}")
         self._serial_port = None
         self._connected = False
         self.connectedChanged.emit()
@@ -219,26 +227,32 @@ class SerialBridge(QObject):
     def send_data(self, data):
         """Send string data over the serial port."""
         if not self._connected or not self._serial_port:
+            logger.warning("尝试发送数据时未连接串口")
             self._set_status("未连接，无法发送")
             return
         try:
             self._serial_port.write(data.encode("utf-8"))
+            logger.debug(f"发送文本数据: {data}")
             self.dataSent.emit(data)
         except Exception as e:
+            logger.error(f"发送文本数据失败: {str(e)}")
             self._set_status(f"发送失败: {str(e)}")
 
     @Slot(str)
     def send_hex_data(self, hex_str):
         """Send hex data (e.g. '01 02 FF') over the serial port."""
         if not self._connected or not self._serial_port:
+            logger.warning("尝试发送HEX数据时未连接串口")
             self._set_status("未连接，无法发送")
             return
         try:
             hex_str = hex_str.replace(" ", "").replace("\n", "").replace("\r", "")
             data = bytes.fromhex(hex_str)
             self._serial_port.write(data)
+            logger.debug(f"发送HEX数据: {hex_str.upper()}")
             self.dataSent.emit(hex_str.upper())
         except Exception as e:
+            logger.error(f"发送HEX数据失败: {str(e)}")
             self._set_status(f"发送失败: {str(e)}")
 
     @Slot()
@@ -372,6 +386,10 @@ def main():
     bridge = SerialBridge()
     engine.rootContext().setContextProperty("serialBridge", bridge)
 
+    # Register logger model (accessible from QML for logging)
+    logger_model = LoggerModel()
+    engine.rootContext().setContextProperty("logger", logger_model)
+
     # Register theme manager (shared across all windows)
     theme_manager = ThemeManager()
     engine.rootContext().setContextProperty("themeManager", theme_manager)
@@ -388,6 +406,7 @@ def main():
 
     # Store references on the engine to prevent garbage collection
     engine._bridge = bridge
+    engine._logger_model = logger_model
     engine._theme_manager = theme_manager
     engine._about_dialog = about_dialog
     engine._settings_dialog = settings_dialog
