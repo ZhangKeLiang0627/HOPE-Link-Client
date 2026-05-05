@@ -4,7 +4,7 @@
 
 > [!TIP]
 > Just a simple client for HOPE-Link(A little toy). 
-> **该程序支持跨平台：Windows/MacOS/Ubuntu。**
+> **该程序支持跨平台：`Windows/MacOS/Ubuntu`.**
 
 
 ## Snapshot
