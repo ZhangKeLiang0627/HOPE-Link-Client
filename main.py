@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -379,6 +380,10 @@ class SerialBridge(QObject):
 
 
 def main():
+    # 使用 Fusion 样式以支持 contentItem 自定义
+    # macOS 原生样式不支持 Button、ComboBox 等控件的 contentItem 自定义
+    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
+
     app = QGuiApplication(sys.argv)
 
     # Determine the path to the icon
