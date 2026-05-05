@@ -2,12 +2,16 @@
 
 # by Hugo@kkl
 
-> Just a simple client for HOPE-Link(A little toy). 支持Windows/MacOS/Ubuntu。
+> [!TIP]
+> Just a simple client for HOPE-Link(A little toy). 
+> **该程序支持跨平台：Windows/MacOS/Ubuntu。**
+
 
 ## Snapshot
 ![](docs/images/image-2.png)
 ![](docs/images/image.png)
 ![](docs/images/image-1.png)
+![](docs/images/video.gif)
 ...
 
 ## Install
