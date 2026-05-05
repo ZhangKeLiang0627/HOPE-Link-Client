@@ -2,6 +2,13 @@
 
 # by Hugo@kkl
 
+> Just a simple client for HOPE-Link(A little toy). 支持Windows/MacOS/Ubuntu。
+
+## Snapshot
+![](docs/images/image-2.png)
+![](docs/images/image.png)
+![](docs/images/image-1.png)
+...
 
 ## Install
 
