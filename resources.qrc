@@ -1,0 +1,17 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <!-- QML Files -->
+        <file>qml/about.qml</file>
+        <file>qml/control.qml</file>
+        <file>qml/main.qml</file>
+        <file>qml/settings.qml</file>
+
+        <!-- Assets - Icons -->
+        <file>assets/icons/icon.ico</file>
+
+        <!-- Assets - Images -->
+        <file>assets/images/avatar.png</file>
+        <file>assets/images/image-0.png</file>
+    </qresource>
+</RCC>
