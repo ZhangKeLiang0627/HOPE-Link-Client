@@ -90,3 +90,5 @@ pyinstaller --onefile --windowed --name="HOPE-Link-Client" --collect-all PySide6
 - 需要兼容串口最基本的调试能力，这块后期可以单独再开一个页面，或者直接在main主页面当中增加，需要让用户直观的看到数据的显示，如果再出现之前的MacOS的那种拆包问题的时候，能够更快的debug出链路断联处；
 
 - 借此机会，整合一个新的qml的UI组件美化库，开一个新的仓库专门维护。
+
+- 目前打包release的大小偏大，引入了许多没有用到的库插件，后续需要精细的优化。
