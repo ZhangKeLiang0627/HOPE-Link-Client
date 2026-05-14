@@ -386,20 +386,9 @@ def main():
 
     app = QGuiApplication(sys.argv)
 
-    # Determine the path to the icon
-    if getattr(sys, 'frozen', False):
-        # If running in a PyInstaller bundle
-        base_path = Path(sys._MEIPASS)
-    else:
-        # If running in a regular Python environment
-        base_path = Path(__file__).resolve().parent
-
-
-    icon_path = base_path / "assets/icons/icon.ico"
-
-    logger.info(f"图标路径: {icon_path}")
-
-    app.setWindowIcon(QIcon(str(icon_path)))
+    # Load icon from Qt resources
+    icon_path = ":/assets/icons/puzzle.ico"
+    app.setWindowIcon(QIcon(icon_path))
     engine = QQmlApplicationEngine()
 
     # Keep strong references to prevent garbage collection

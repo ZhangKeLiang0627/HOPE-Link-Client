@@ -9,6 +9,7 @@
 
         <!-- Assets - Icons -->
         <file>assets/icons/icon.ico</file>
+        <file>assets/icons/puzzle.ico</file>
 
         <!-- Assets - Images -->
         <file>assets/images/avatar.png</file>
