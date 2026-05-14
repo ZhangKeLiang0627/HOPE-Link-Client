@@ -73,10 +73,10 @@ def build_args() -> list[str]:
 
     # Convenience
     args.append("--assume-yes-for-downloads")
-
+    args.append("--include-qt-plugins=qml,platforms")
     # Platform-specific flags
     if sys.platform == "win32":
-        args.append("--windows-console-mode=force")
+        args.append("--windows-console-mode=disable")
         icon = _icon_path()
         if icon:
             args.append(f'--windows-icon-from-ico={icon}')
