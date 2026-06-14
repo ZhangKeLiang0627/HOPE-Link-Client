@@ -305,7 +305,6 @@ jobs:
     env:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
       VERSION_NAME: ${{ needs.get-version.outputs.VERSION_NAME }}
-      NUITKA_JOBS: "2"
     steps:
       - uses: actions/checkout@v6
 
@@ -332,46 +331,48 @@ jobs:
         run: python scripts/deploy.py
         timeout-minutes: 120
 
-      - name: Post-build fixups
+      - name: Wrap standalone build into .app bundle
         run: |
-          APP_BUNDLE=$(find dist -maxdepth 2 -name "*.app" -type d | head -1)
-          if [ -n "$APP_BUNDLE" ]; then
-            chmod +x "$APP_BUNDLE/Contents/MacOS/"*
-            rm -rf "dist/main.build" 2>/dev/null || true
-            rm -rf "dist/main.dist" 2>/dev/null || true
-          fi
+          APP_NAME="HOPE-Link-Client"
+          APP_BUNDLE="dist/${APP_NAME}.app"
+          MACOS="${APP_BUNDLE}/Contents/MacOS"
+          RESOURCES="${APP_BUNDLE}/Contents/Resources"
 
-      - name: Rename app bundle
-        run: |
-          if [ -d "dist/main.app" ]; then
-            mv "dist/main.app" "dist/HOPE-Link-Client.app"
-            echo "Renamed dist/main.app → dist/HOPE-Link-Client.app"
-          else
-            echo "No dist/main.app found (already renamed?)"
-            ls dist/
-          fi
+          mkdir -p "$MACOS" "$RESOURCES"
+          cp -R dist/main.dist/* "$MACOS/"
+          chmod +x "$MACOS/main.bin" 2>/dev/null || chmod +x "$MACOS/main" 2>/dev/null || true
+          cp assets/icons/puzzle.icns "$RESOURCES/" 2>/dev/null || true
+
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleExecutable string main" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleIdentifier string com.kkl.${APP_NAME}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleName string ${APP_NAME}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleVersion string ${VERSION}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleShortVersionString string ${VERSION}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleIconFile string puzzle" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add NSHighResolutionCapable bool true" 2>/dev/null || true
+          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundlePackageType string APPL" 2>/dev/null || true
+
+          echo "Created .app: $APP_BUNDLE"
+          rm -rf dist/main.dist dist/main.build 2>/dev/null || true
 
       - name: Package .dmg
         run: |
-          APP_BUNDLE=$(find dist -maxdepth 2 -name "*.app" -type d | head -1)
-          if [ -z "$APP_BUNDLE" ]; then
-            echo "ERROR: No .app bundle found in dist/"
+          APP_BUNDLE="dist/HOPE-Link-Client.app"
+          if [ ! -d "$APP_BUNDLE" ]; then
+            echo "ERROR: $APP_BUNDLE not found"
             ls -la dist/
             exit 1
           fi
-          echo "Found app bundle: $APP_BUNDLE"
-          APP_NAME=$(basename "$APP_BUNDLE" .app)
-
           create-dmg \
             --volname "HOPE-Link-Client Installer" \
             --window-pos 400 200 \
             --window-size 660 400 \
             --icon-size 80 \
-            --icon "${APP_NAME}.app" 160 160 \
-            --hide-extension "${APP_NAME}.app" \
+            --icon "HOPE-Link-Client.app" 160 160 \
+            --hide-extension "HOPE-Link-Client.app" \
             --app-drop-link 500 160 \
             "HOPE-Link-Client_${{ env.VERSION_NAME }}_macos_${{ matrix.arch }}.dmg" \
-            "${APP_BUNDLE}"
+            "$APP_BUNDLE"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

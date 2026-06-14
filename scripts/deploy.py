@@ -93,9 +93,9 @@ def build_args() -> list[str]:
         if icon:
             args.append(f"--macos-app-icon={icon}")
         args.append("--static-libpython=no")
-        args.append("--macos-create-app-bundle")
-        args.append("--macos-app-mode=gui")
-        args.append(f"--macos-app-version={META['version']}")
+        # NOTE: deliberately skip --macos-create-app-bundle to avoid the
+        # ad-hoc codesign step which fails on many CI runners.  The CI
+        # workflow builds the .app bundle and .dmg externally.
     else:
         # Linux
         icon = _icon_path()
