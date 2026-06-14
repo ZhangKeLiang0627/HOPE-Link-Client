@@ -96,9 +96,12 @@ def build_args() -> list[str]:
         args.append("--macos-create-app-bundle")
         args.append("--macos-app-mode=gui")
         args.append(f"--macos-app-version={META['version']}")
+        # Disable automatic code signing on CI (GitHub Actions env
+        # may lack proper signing identity; sign manually if distributing
+        # through Mac App Store).
+        args.append("--macos-no-sign")
     else:
         # Linux
-        args.append("--include-qt-plugins=platforms")
         icon = _icon_path()
         if icon:
             args.append(f"--linux-icon={icon}")
