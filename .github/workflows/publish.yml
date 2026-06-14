@@ -327,42 +327,32 @@ jobs:
       - name: Compile Qt resources
         run: pyside6-rcc resources.qrc -o resources_rc.py
 
-      - name: Build with Nuitka
+      - name: Build with Nuitka (creates .app, codesign failure is handled in deploy.py)
         run: python scripts/deploy.py
         timeout-minutes: 120
 
-      - name: Wrap standalone build into .app bundle
+      - name: Rename app bundle
         run: |
-          APP_NAME="HOPE-Link-Client"
-          APP_BUNDLE="dist/${APP_NAME}.app"
-          MACOS="${APP_BUNDLE}/Contents/MacOS"
-          RESOURCES="${APP_BUNDLE}/Contents/Resources"
+          if [ -d "dist/main.app" ]; then
+            mv "dist/main.app" "dist/HOPE-Link-Client.app"
+            echo "Renamed dist/main.app → dist/HOPE-Link-Client.app"
+          else
+            echo "No dist/main.app found"
+            ls -la dist/
+            exit 1
+          fi
 
-          mkdir -p "$MACOS" "$RESOURCES"
-          cp -R dist/main.dist/* "$MACOS/"
-          chmod +x "$MACOS/main.bin" 2>/dev/null || chmod +x "$MACOS/main" 2>/dev/null || true
-          cp assets/icons/puzzle.icns "$RESOURCES/" 2>/dev/null || true
-
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleExecutable string main" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleIdentifier string com.kkl.${APP_NAME}" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleName string ${APP_NAME}" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleVersion string ${VERSION}" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleShortVersionString string ${VERSION}" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundleIconFile string puzzle" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add NSHighResolutionCapable bool true" 2>/dev/null || true
-          /usr/libexec/PlistBuddy "$APP_BUNDLE/Contents/Info.plist" -c "Add CFBundlePackageType string APPL" 2>/dev/null || true
-
-          echo "Created .app: $APP_BUNDLE"
-          rm -rf dist/main.dist dist/main.build 2>/dev/null || true
-
-      - name: Ad-hoc sign the .app bundle (required by macOS Gatekeeper)
+      - name: Clean build artifacts for signing
         run: |
           APP_BUNDLE="dist/HOPE-Link-Client.app"
-          # Remove build artifacts that codesign chokes on
           find "$APP_BUNDLE" -type d -name ".qt" -exec rm -rf {} + 2>/dev/null || true
           find "$APP_BUNDLE" -name "*.o" -delete 2>/dev/null || true
-          codesign --force --deep -s - "$APP_BUNDLE"
-          echo "Signed (ad-hoc): $APP_BUNDLE"
+          rm -rf "dist/main.dist" "dist/main.build" 2>/dev/null || true
+
+      - name: Ad-hoc sign the .app bundle
+        run: |
+          codesign --force --deep -s - "dist/HOPE-Link-Client.app"
+          echo "Signed (ad-hoc): dist/HOPE-Link-Client.app"
 
       - name: Package .dmg
         run: |

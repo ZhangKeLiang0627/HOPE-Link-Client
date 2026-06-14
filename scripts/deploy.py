@@ -93,9 +93,9 @@ def build_args() -> list[str]:
         if icon:
             args.append(f"--macos-app-icon={icon}")
         args.append("--static-libpython=no")
-        # NOTE: deliberately skip --macos-create-app-bundle to avoid the
-        # ad-hoc codesign step which fails on many CI runners.  The CI
-        # workflow builds the .app bundle and .dmg externally.
+        args.append("--macos-create-app-bundle")
+        args.append("--macos-app-mode=gui")
+        args.append(f"--macos-app-version={META['version']}")
     else:
         # Linux
         icon = _icon_path()
@@ -117,6 +117,19 @@ def main() -> int:
     print(f"--- Nuitka build command ---\n{command}\n")
     result = subprocess.run(command, shell=True)
     if result.returncode != 0:
+        # On macOS, Nuitka's ad-hoc codesign often fails on CI runners,
+        # but the .app bundle is already fully constructed at that point.
+        # Only treat it as a real failure if the .app is missing.
+        if sys.platform == "darwin":
+            app_bundle = PROJECT_ROOT / "dist" / "main.app"
+            if app_bundle.is_dir():
+                print(
+                    "Warning: Nuitka exited with non-zero (likely codesign), "
+                    "but .app bundle exists.  Continuing — signing will be "
+                    "handled by CI."
+                )
+                print(f"\nDone.  Artifact: {app_bundle}")
+                return 0
         return result.returncode
 
     print(f"\nDone.  Artifact: {PROJECT_ROOT / 'dist'}")
