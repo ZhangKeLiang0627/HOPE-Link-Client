@@ -1,25 +1,25 @@
-"""
-Resource Compiler Script
+"""Resource Compiler Script
 Compiles resources.qrc into resources_rc.py using PySide6's rcc tool.
 
 Usage:
-    python compile_resources.py          # Compile resources.qrc -> resources_rc.py
-    python compile_resources.py --clean   # Remove the generated resources_rc.py
+    conda activate pyside6
+    python scripts/compile_resources.py          # Compile resources.qrc -> resources_rc.py
+    python scripts/compile_resources.py --clean   # Remove the generated resources_rc.py
 """
 
-import os
 import sys
 import subprocess
+from pathlib import Path
 
 # Paths
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-QRC_FILE = os.path.join(ROOT_DIR, "resources.qrc")
-OUTPUT_FILE = os.path.join(ROOT_DIR, "resources_rc.py")
+ROOT_DIR = Path(__file__).resolve().parent.parent
+QRC_FILE = ROOT_DIR / "resources.qrc"
+OUTPUT_FILE = ROOT_DIR / "resources_rc.py"
 
 
 def compile_resources():
     """Compile resources.qrc into resources_rc.py using pyside6-rcc."""
-    if not os.path.exists(QRC_FILE):
+    if not QRC_FILE.is_file():
         print(f"[ERROR] QRC file not found: {QRC_FILE}")
         sys.exit(1)
 
@@ -28,7 +28,7 @@ def compile_resources():
 
     try:
         result = subprocess.run(
-            ["pyside6-rcc", QRC_FILE, "-o", OUTPUT_FILE],
+            ["pyside6-rcc", str(QRC_FILE), "-o", str(OUTPUT_FILE)],
             capture_output=True,
             text=True,
             cwd=ROOT_DIR,
@@ -46,8 +46,8 @@ def compile_resources():
 
 def clean():
     """Remove the generated resources_rc.py file."""
-    if os.path.exists(OUTPUT_FILE):
-        os.remove(OUTPUT_FILE)
+    if OUTPUT_FILE.is_file():
+        OUTPUT_FILE.unlink()
         print(f"[INFO] Removed: {OUTPUT_FILE}")
     else:
         print(f"[INFO] File not found, nothing to clean: {OUTPUT_FILE}")

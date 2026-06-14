@@ -47,7 +47,7 @@ pip install -r requirements.txt
 sudo apt install libxcb-cursor0 libxcb-xinerama0 libxcb-randr0 libxcb-render0 libxcb-shape0 libxcb-xfixes0 libxcb-xkb-dev libxkbcommon-x11-0
 
 # 编译resources.qrc
-python compile_resources.py
+python scripts/compile_resources.py
 
 # 运行项目
 python main.py
