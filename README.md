@@ -1,6 +1,18 @@
-# HOPE-Link-Client
+<p align="center">
+  <img width="18%" align="center" src="https://github.com/ZhangKeLiang0627/HOPE-Link-Client/blob/develop/assets/icons/puzzle.svg?raw=true" alt="logo">
+</p>
+  <h1 align="center">
+  HOPE-Link-Client
+</h1>
+<p align="center">
+  Created by Hugo@kkl
+</p>
 
-# by Hugo@kkl
+---
+
+<!-- # HOPE-Link-Client
+
+# by Hugo@kkl -->
 
 > [!TIP]
 > Just a simple client for HOPE-Link(A little toy). 
