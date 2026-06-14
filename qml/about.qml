@@ -125,7 +125,7 @@ Window {
             // Version info
             Text {
                 Layout.alignment: Qt.AlignHCenter
-                text: "HOPE-Link Client v1.0"
+                text: "HOPE-Link Client v" + appVersion
                 color: subTextColor
                 font.pixelSize: 11
 

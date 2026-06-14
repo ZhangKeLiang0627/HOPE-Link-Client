@@ -14,6 +14,7 @@ from src.control import ControlDialog
 from src.theme_manager import ThemeManager
 from src.models import LoggerModel
 from src.utils.logging import logger
+from src.core.config import appVersion
 
 import resources_rc
 
@@ -399,6 +400,9 @@ def main():
     # Register logger model (accessible from QML for logging)
     logger_model = LoggerModel()
     engine.rootContext().setContextProperty("logger", logger_model)
+
+    # Register app version (shared across all QML windows)
+    engine.rootContext().setContextProperty("appVersion", appVersion)
 
     # Register theme manager (shared across all windows)
     theme_manager = ThemeManager()

@@ -23,9 +23,9 @@ MAIN_SCRIPT = PROJECT_ROOT / "main.py"
 
 # Import runtime metadata from the app's config module.
 sys.path.insert(0, str(PROJECT_ROOT))
+from src.core.config import appVersion as VERSION
 
 APP_NAME = "HOPE-Link-Client"
-VERSION = "0.1.0"
 # Construct a minimal metadata dict for the packager
 META = {
     "version": VERSION,
