@@ -358,9 +358,9 @@ jobs:
       - name: Ad-hoc sign the .app bundle (required by macOS Gatekeeper)
         run: |
           APP_BUNDLE="dist/HOPE-Link-Client.app"
-          # Remove build artifacts (.o files, .qt/rcc dirs) from PySide6
-          # that codesign cannot handle.
-          find "$APP_BUNDLE" \( -name "*.o" -o -path "*/.qt/rcc*" \) -exec rm -rf {} + 2>/dev/null || true
+          # Remove build artifacts that codesign chokes on
+          find "$APP_BUNDLE" -type d -name ".qt" -exec rm -rf {} + 2>/dev/null || true
+          find "$APP_BUNDLE" -name "*.o" -delete 2>/dev/null || true
           codesign --force --deep -s - "$APP_BUNDLE"
           echo "Signed (ad-hoc): $APP_BUNDLE"
 
