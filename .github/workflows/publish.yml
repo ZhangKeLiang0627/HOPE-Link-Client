@@ -328,24 +328,9 @@ jobs:
       - name: Compile Qt resources
         run: pyside6-rcc resources.qrc -o resources_rc.py
 
-      - name: Disable code signing for CI (Nuitka OSS has no --macos-no-sign)
-        run: |
-          # Place a no-op codesign wrapper at /usr/local/bin, which comes
-          # before /usr/bin in PATH on macOS, so Nuitka finds it first.
-          # We only need real signing when distributing (Mac App Store).
-          cat > /usr/local/bin/codesign << 'CSIGNEOF'
-          #!/bin/bash
-          # No-op codesign for CI builds — skip actual signing.
-          exit 0
-          CSIGNEOF
-          chmod +x /usr/local/bin/codesign
-
       - name: Build with Nuitka
         run: python scripts/deploy.py
         timeout-minutes: 120
-
-      - name: Restore codesign
-        run: rm -f /usr/local/bin/codesign
 
       - name: Post-build fixups
         run: |
@@ -371,6 +356,7 @@ jobs:
           APP_BUNDLE=$(find dist -maxdepth 2 -name "*.app" -type d | head -1)
           if [ -z "$APP_BUNDLE" ]; then
             echo "ERROR: No .app bundle found in dist/"
+            ls -la dist/
             exit 1
           fi
           echo "Found app bundle: $APP_BUNDLE"

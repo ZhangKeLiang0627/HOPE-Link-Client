@@ -13,7 +13,6 @@ Customize:
 
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -71,12 +70,6 @@ def build_args() -> list[str]:
 
     # Extra packages the bundler might miss
     args.extend(build_include_args())
-
-    # Limit parallel compilation jobs to reduce peak memory usage.
-    # GitHub runners have ~7 GB RAM — with default parallel jobs
-    # PySide6 can trigger OOM.  Adjust via NUITKA_JOBS env var.
-    jobs = os.environ.get("NUITKA_JOBS", "2")
-    args.append(f"--jobs={jobs}")
 
     # Convenience
     args.append("--assume-yes-for-downloads")
