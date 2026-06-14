@@ -355,6 +355,12 @@ jobs:
           echo "Created .app: $APP_BUNDLE"
           rm -rf dist/main.dist dist/main.build 2>/dev/null || true
 
+      - name: Ad-hoc sign the .app bundle (required by macOS Gatekeeper)
+        run: |
+          APP_BUNDLE="dist/HOPE-Link-Client.app"
+          codesign --force --deep -s - "$APP_BUNDLE"
+          echo "Signed (ad-hoc): $APP_BUNDLE"
+
       - name: Package .dmg
         run: |
           APP_BUNDLE="dist/HOPE-Link-Client.app"
